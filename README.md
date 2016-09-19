@@ -32,14 +32,15 @@ Since spark version 2.0.0, broadcast is no longer an exchangeable plugin, unfort
 
 ## Contributions
 
-PRs are always welcome. Please fork, and make necessary modifications you propose, and let us know.
+PRs are always welcome. Please fork, and make necessary modifications 
+you propose, and let us know. 
 
-## Contact
+## Contact 
 
 If you have questions or suggestions, feel free to post at:
 
-https://groups.google.com/forum/#!forum/zrlio-users (https://groups.google.com/forum/#%21forum/zrlio-users) 
+https://groups.google.com/forum/#!forum/zrlio-users
 
-or email: zrlio-users@googlegroups.com 
+or email: zrlio-users@googlegroups.com
 
 
