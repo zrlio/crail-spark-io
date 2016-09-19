@@ -30,10 +30,16 @@ To configure the crail shuffle plugin included in spark-io add the following lin
 ```
 Since spark version 2.0.0, broadcast is no longer an exchangeable plugin, unfortunately. To use the crail broadcast plugin in Spark it has to be manually added to Spark's BroadcastManager.scala.
 
+## Contributions
+
+PRs are always welcome. Please fork, and make necessary modifications you propose, and let us know.
+
 ## Contact
 
-If you have questions feel free to post at:
+If you have questions or suggestions, feel free to post at:
 
-https://groups.google.com/forum/#!forum/zrlio-users
+https://groups.google.com/forum/#!forum/zrlio-users (https://groups.google.com/forum/#%21forum/zrlio-users) 
+
+or email: zrlio-users@googlegroups.com 
 
 
