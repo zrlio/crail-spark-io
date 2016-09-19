@@ -30,6 +30,10 @@ To configure the crail shuffle plugin included in spark-io add the following lin
 ```
 Since spark version 2.0.0, broadcast is no longer an exchangeable plugin, unfortunately. To use the crail broadcast plugin in Spark it has to be manually added to Spark's BroadcastManager.scala.
 
+## Running
+
+For the Crail shuffler to perform best, applications are encouraged to provide their own application specific serializer and sorter to the Crail shuffler. As an example, have a look at [crail-terasort](https://github.com/zrlio/crail-terasort). 
+
 ## Contributions
 
 PRs are always welcome. Please fork, and make necessary modifications 
