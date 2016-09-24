@@ -59,7 +59,7 @@ class RdfsShuffleReader[K, C](
       case Some(keyOrd: Ordering[K]) =>
       crailSorter.sort(context, keyOrd, dep.serializer, deserializationStream)
       case None =>
-        deserializationStream.asKeyValueIterator.asInstanceOf[Iterator[Product2[K, C]]]
+        new CrailInputCloser(multiStream, deserializationStream.asKeyValueIterator.asInstanceOf[Iterator[Product2[K, C]]])
       }
   }
 }
