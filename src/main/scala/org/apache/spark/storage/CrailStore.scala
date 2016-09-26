@@ -54,7 +54,7 @@ class CrailStore () extends Logging {
   val appId: String = conf.getAppId
   val serializer = SparkEnv.get.serializer
 
-  val rootDir = "/peregrine"
+  val rootDir = "/crail"
   val broadcastDir = rootDir + "/broadcast"
   val shuffleDir = rootDir + "/shuffle"
   val rddDir = rootDir + "/rdd"
