@@ -21,15 +21,11 @@
 
 package org.apache.spark.shuffle.crail
 
-import java.io.{OutputStream, File}
-
-
 import org.apache.spark._
+import org.apache.spark.common._
 import org.apache.spark.scheduler.MapStatus
-import org.apache.spark.serializer.{SerializationStream, Serializer}
 import org.apache.spark.shuffle._
 import org.apache.spark.storage._
-import org.apache.spark.common._
 
 
 class CrailShuffleWriter[K, V](
@@ -47,11 +43,12 @@ class CrailShuffleWriter[K, V](
   private val debug = CrailStore.get.getDebug()
   private val shuffleId = dep.shuffleId
   var start_init : Long = 0
+  var serializerInstance = crailSerializer.newCrailSerializer(dep)
 
   if (debug){
     start_init = System.currentTimeMillis()
   }
-  private val shuffle : CrailShuffleWriterGroup = CrailStore.get.getWriterGroup(dep.shuffleId, dep.partitioner.numPartitions, crailSerializer, writeMetrics)
+  private val shuffle : CrailShuffleWriterGroup = CrailStore.get.getWriterGroup(dep.shuffleId, dep.partitioner.numPartitions, serializerInstance, writeMetrics)
   if (debug){
     var end_init = System.currentTimeMillis()
     val startTime = end_init - start_init

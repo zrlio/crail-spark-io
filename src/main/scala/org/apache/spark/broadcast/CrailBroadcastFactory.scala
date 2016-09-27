@@ -21,9 +21,9 @@
 
 package org.apache.spark.broadcast
 
-import org.apache.spark.SparkConf
+import org.apache.spark.{SecurityManager, SparkConf}
+
 import scala.reflect.ClassTag
-import org.apache.spark.SecurityManager
 
 
 class CrailBroadcastFactory extends BroadcastFactory {

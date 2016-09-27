@@ -1,55 +1,43 @@
+/*
+ * Spark-IO: Fast storage and network I/O for Spark
+ *
+ * Author: Patrick Stuedi <stu@zurich.ibm.com>
+ *
+ * Copyright (C) 2016, IBM Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package org.apache.spark.shuffle.crail
 
 
-import java.io._
 import java.nio.ByteBuffer
-import org.apache.spark.serializer.{DeserializationStream, SerializationStream, Serializer, SerializerInstance}
-import com.ibm.crail.{CrailMultiStream, CrailBufferedOutputStream}
+
+import com.ibm.crail.{CrailBufferedOutputStream, CrailMultiStream}
+import org.apache.spark.ShuffleDependency
+import org.apache.spark.serializer.{DeserializationStream, SerializationStream, SerializerInstance}
+
 import scala.reflect.ClassTag
 
-///**
-// * Created by stu on 13.09.16.
-// */
-//class CrailSparkShuffleSerializer {
-//
-//}
-
-
-class CrailSparkShuffleSerializer(val serializer: Serializer) extends Serializer with CrailShuffleSerializer {
-  override final def newInstance(): SerializerInstance = {
-    new CrailSparkShuffleSerializerInstance(serializer.newInstance())
-  }
-  override lazy val supportsRelocationOfSerializedObjects: Boolean = true
-
-  override def newCrailSerializer(): CrailSerializerInstance = {
-    new CrailSparkShuffleSerializerInstance(serializer.newInstance())
+class CrailSparkShuffleSerializer() extends CrailShuffleSerializer {
+  override def newCrailSerializer[K,V](dep: ShuffleDependency[K,_,V]): CrailSerializerInstance = {
+    new CrailSparkShuffleSerializerInstance(dep.serializer.newInstance())
   }
 }
 
 
-class CrailSparkShuffleSerializerInstance(val serializerInstance: SerializerInstance) extends SerializerInstance with CrailSerializerInstance {
-
-  override final def serialize[T: ClassTag](t: T): ByteBuffer = {
-    serializerInstance.serialize(t)
-  }
-
-  override final def deserialize[T: ClassTag](bytes: ByteBuffer): T = {
-    serializerInstance.deserialize(bytes)
-  }
-
-  override final def deserialize[T: ClassTag](bytes: ByteBuffer, loader: ClassLoader): T = {
-    serializerInstance.deserialize(bytes, loader)
-  }
-
-  override final def serializeStream(s: OutputStream): SerializationStream = {
-    serializerInstance.serializeStream(s)
-  }
-
-  /* this is the one we are interested in */
-  override final def deserializeStream(s: InputStream): DeserializationStream = {
-    serializerInstance.deserializeStream(s)
-  }
-
+class CrailSparkShuffleSerializerInstance(val serializerInstance: SerializerInstance) extends CrailSerializerInstance {
   override def serializeCrailStream(s: CrailBufferedOutputStream): CrailSerializationStream = {
     new CrailSparkSerializerStream(serializerInstance.serializeStream(s))
   }

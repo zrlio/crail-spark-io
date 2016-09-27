@@ -21,18 +21,14 @@
 
 package org.apache.spark.shuffle.crail
 
-import java.io.InputStream
-import com.ibm.crail.CrailInputStream
-import org.apache.spark.serializer.SerializerManager
-import org.apache.spark.storage._
-import org.apache.spark.util.CompletionIterator
 import org.apache.spark._
-import org.apache.spark.shuffle.{BaseShuffleHandle, ShuffleReader}
-import org.apache.spark.util.collection.ExternalSorter
 import org.apache.spark.common._
+import org.apache.spark.serializer.SerializerManager
+import org.apache.spark.shuffle.{BaseShuffleHandle, ShuffleReader}
+import org.apache.spark.storage._
 
 
-class RdfsShuffleReader[K, C](
+class CrailShuffleReader[K, C](
     handle: BaseShuffleHandle[K, _, C],
     startPartition: Int,
     endPartition: Int,
@@ -48,12 +44,11 @@ class RdfsShuffleReader[K, C](
     "Hash shuffle currently only supports fetching one partition")
 
   private val dep = handle.dependency
-
+  private val serializerInstance = crailSerializer.newCrailSerializer(dep)
 
   /** Read the combined key-values for this reduce task */
   override def read(): Iterator[Product2[K, C]] = {
     val multiStream = CrailStore.get.getMultiStream(handle.shuffleId, startPartition, handle.numMaps)
-    val serializerInstance = crailSerializer.newCrailSerializer()
     val deserializationStream = serializerInstance.deserializeCrailStream(multiStream)
     dep.keyOrdering match {
       case Some(keyOrd: Ordering[K]) =>

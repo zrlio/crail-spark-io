@@ -1,18 +1,17 @@
 package org.apache.spark.shuffle.crail
 
-import java.io.{EOFException}
 import java.nio.ByteBuffer
-import com.ibm.crail.{CrailMultiStream, CrailInputStream, CrailBufferedOutputStream}
+
+import com.ibm.crail.{CrailBufferedOutputStream, CrailMultiStream}
+import org.apache.spark.ShuffleDependency
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.serializer._
-import org.apache.spark.util.NextIterator
-import scala.reflect.ClassTag
 
 /**
  * Created by stu on 08.09.16.
  */
 trait CrailShuffleSerializer {
-  def newCrailSerializer(): CrailSerializerInstance
+  def newCrailSerializer[K, V](dep: ShuffleDependency[K,_,V]): CrailSerializerInstance
 }
 
 trait CrailSerializerInstance {

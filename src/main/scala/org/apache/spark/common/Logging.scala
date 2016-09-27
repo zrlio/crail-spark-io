@@ -18,10 +18,10 @@
 
 package org.apache.spark.common
 
-import org.apache.log4j.{Level, PropertyConfigurator, LogManager}
+import org.apache.log4j.{Level, LogManager, PropertyConfigurator}
 import org.apache.spark.util.Utils
-import org.slf4j.{Logger, LoggerFactory}
 import org.slf4j.impl.StaticLoggerBinder
+import org.slf4j.{Logger, LoggerFactory}
 
 /**
  * Created by stu on 09.06.16.

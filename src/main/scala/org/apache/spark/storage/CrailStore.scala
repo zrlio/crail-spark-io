@@ -21,20 +21,20 @@
 
 package org.apache.spark.storage
 
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong, AtomicInteger}
-import com.ibm.crail.conf.{CrailConstants, CrailConfiguration}
-import com.ibm.crail.utils.{AutoCloseInputStream}
-import org.apache.spark._
+import java.io.OutputStream
 import java.nio.ByteBuffer
-import org.apache.spark.executor.ShuffleWriteMetrics
-import org.apache.spark.serializer.{SerializationStream, Serializer}
-import java.io.{InputStream, OutputStream}
-import java.util.concurrent.{Future, LinkedBlockingQueue, ConcurrentHashMap}
-import org.apache.spark.shuffle.crail.CrailShuffleSerializer
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicLong}
+import java.util.concurrent.{ConcurrentHashMap, Future, LinkedBlockingQueue}
 
-import scala.util.{Random}
 import com.ibm.crail._
+import com.ibm.crail.conf.CrailConfiguration
+import org.apache.spark._
 import org.apache.spark.common._
+import org.apache.spark.executor.ShuffleWriteMetrics
+import org.apache.spark.serializer.SerializationStream
+import org.apache.spark.shuffle.crail.CrailSerializerInstance
+
+import scala.util.Random
 
 
 class CrailBlockFile (name: String, var file: CrailFile) {
@@ -405,7 +405,7 @@ class CrailStore () extends Logging {
     val executionTime = (end - start) / 1000.0
   }
 
-  def getWriterGroup(shuffleId: Int, numBuckets: Int, serializer: CrailShuffleSerializer, writeMetrics: ShuffleWriteMetrics) : CrailShuffleWriterGroup = {
+  def getWriterGroup(shuffleId: Int, numBuckets: Int, serializerInstance: CrailSerializerInstance, writeMetrics: ShuffleWriteMetrics) : CrailShuffleWriterGroup = {
     streamGroupOpenStats.incrementAndGet()
     var fileGroup = getFileGroup(shuffleId)
     if (fileGroup == null){
@@ -431,7 +431,7 @@ class CrailStore () extends Logging {
       }
     }
 
-    val shuffleGroup = new CrailShuffleWriterGroup(fileGroup, shuffleId, serializer, writeMetrics, writeAhead)
+    val shuffleGroup = new CrailShuffleWriterGroup(fileGroup, shuffleId, serializerInstance, writeMetrics, writeAhead)
     return shuffleGroup
   }
 
@@ -555,14 +555,14 @@ class CrailFileGroup(val shuffleId: Int, val executorId: String, val fileId: Int
   }
 }
 
-class CrailShuffleWriterGroup(val fileGroup: CrailFileGroup, shuffleId: Int, serializer: CrailShuffleSerializer, writeMetrics: ShuffleWriteMetrics, writeAhead: Long) extends Logging {
+class CrailShuffleWriterGroup(val fileGroup: CrailFileGroup, shuffleId: Int, serializerInstance: CrailSerializerInstance, writeMetrics: ShuffleWriteMetrics, writeAhead: Long) extends Logging {
   val files = fileGroup.writers
   val streams: Array[CrailBufferedOutputStream] = new Array[CrailBufferedOutputStream](files.length)
   val writers: Array[CrailObjectWriter] = new Array[CrailObjectWriter](files.length)
 
   for (i <- 0 until files.length){
     streams(i) = files(i).getBufferedOutputStream(writeAhead)
-    writers(i) = new CrailObjectWriter(streams(i), serializer, writeMetrics, shuffleId, i)
+    writers(i) = new CrailObjectWriter(streams(i), serializerInstance, writeMetrics, shuffleId, i)
   }
 
   def flushSerializer(): Unit = {
@@ -627,7 +627,7 @@ object CrailStore extends Logging {
   }
 }
 
-private[spark] class CrailObjectWriter(directStream: CrailBufferedOutputStream, serializer: CrailShuffleSerializer, writeMetrics: ShuffleWriteMetrics, shuffleId: Int, reduceId: Int)
+private[spark] class CrailObjectWriter(directStream: CrailBufferedOutputStream, serializerInstance: CrailSerializerInstance, writeMetrics: ShuffleWriteMetrics, shuffleId: Int, reduceId: Int)
   extends OutputStream
   with Logging
 {
@@ -640,7 +640,7 @@ private[spark] class CrailObjectWriter(directStream: CrailBufferedOutputStream, 
     if (hasBeenClosed) {
       throw new IllegalStateException("Writer already closed. Cannot be reopened.")
     }
-    directObjOut = serializer.newCrailSerializer().serializeCrailStream(directStream)
+    directObjOut = serializerInstance.serializeCrailStream(directStream)
     initialized = true
     this
   }

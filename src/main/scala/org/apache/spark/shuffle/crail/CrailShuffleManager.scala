@@ -24,10 +24,10 @@ package org.apache.spark.shuffle.crail
 import java.util.concurrent.atomic.AtomicBoolean
 
 import org.apache.spark._
+import org.apache.spark.common._
 import org.apache.spark.network.buffer.ManagedBuffer
 import org.apache.spark.shuffle._
-import org.apache.spark.storage.{ShuffleBlockId, CrailStore}
-import org.apache.spark.common._
+import org.apache.spark.storage.{CrailStore, ShuffleBlockId}
 import org.apache.spark.util.Utils
 
 
@@ -37,10 +37,9 @@ import org.apache.spark.util.Utils
  */
 private[spark] class CrailShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
 
-  logInfo("rdfs shuffle started")
+  logInfo("crail shuffle started")
 
   private val fileShuffleBlockManager = new CrailShuffleBlockResolver(conf)
-//  private lazy val blockManager = SparkEnv.get.blockManager
   private var intialized = new AtomicBoolean(false)
 
   lazy val shuffleSorterClass =
@@ -74,7 +73,7 @@ private[spark] class CrailShuffleManager(conf: SparkConf) extends ShuffleManager
       logInfo("loading shuffler serializer " + shuffleSerializerClass)
       logInfo("loading shuffler sorter " + shuffleSorterClass)
     }
-    new RdfsShuffleReader(handle.asInstanceOf[BaseShuffleHandle[K, _, C]],
+    new CrailShuffleReader(handle.asInstanceOf[BaseShuffleHandle[K, _, C]],
       startPartition, endPartition, context, shuffleSerializer, shuffleSorter)
   }  
   
