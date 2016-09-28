@@ -57,9 +57,13 @@ class CrailSparkSerializerStream(serializerStream: SerializationStream) extends 
     serializerStream.flush()
   }
 
-  override final def writeKey[T: ClassTag](key: T): SerializationStream = writeObject(key)
+  override final def writeKey[T: ClassTag](key: T): SerializationStream = {
+    serializerStream.writeKey(key)
+  }
   /** Writes the object representing the value of a key-value pair. */
-  override final def writeValue[T: ClassTag](value: T): SerializationStream = writeObject(value)
+  override final def writeValue[T: ClassTag](value: T): SerializationStream = {
+    serializerStream.writeValue(value)
+  }
 
   override final def close(): Unit = {
     serializerStream.close()
