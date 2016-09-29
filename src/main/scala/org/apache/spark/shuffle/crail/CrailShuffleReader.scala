@@ -40,8 +40,7 @@ class CrailShuffleReader[K, C](
     mapOutputTracker: MapOutputTracker = SparkEnv.get.mapOutputTracker)
   extends ShuffleReader[K, C] with Logging
 {
-  require(endPartition == startPartition + 1,
-    "Hash shuffle currently only supports fetching one partition")
+  require(endPartition == startPartition + 1, "Crail shuffle currently only supports fetching one partition")
 
   private val dep = handle.dependency
   private val serializerInstance = crailSerializer.newCrailSerializer(dep)

@@ -31,10 +31,6 @@ import org.apache.spark.storage.{CrailStore, ShuffleBlockId}
 import org.apache.spark.util.Utils
 
 
-/**
- * A ShuffleManager using Peregrine, that creates one output file per reduce partition on each
- * mapper (possibly reusing these across waves of tasks).
- */
 private[spark] class CrailShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
 
   logInfo("crail shuffle started")
@@ -96,12 +92,9 @@ private[spark] class CrailShuffleManager(conf: SparkConf) extends ShuffleManager
   
   /** Shut down this ShuffleManager. */
   override def stop(): Unit = {
-    logInfo("shutting shuffle manager")
+    logInfo("shutting down crail shuffle manager")
     CrailStore.put
-  }  
-  
-  //----
-  
+  }
 }
 
 private object CrailShuffleManager extends Logging {

@@ -51,7 +51,6 @@ private[spark] class CrailBroadcast[T: ClassTag](obj: T, id: Long)
   }
   
   private def writeBlocks(value: T) {
-    logInfo("RdfsBroadcast, writeBlocks")
     CrailStore.get.putValues(broadcastId, Iterator(value))
     SparkEnv.get.blockManager.master.updateBlockInfo(SparkEnv.get.blockManager.blockManagerId, broadcastId, StorageLevel.OFF_HEAP, 32, 32)
   }
@@ -81,10 +80,8 @@ object Utils {
       block
     } catch {
       case e: IOException =>
-        //        logError("Exception encountered", e)
         throw e
       case NonFatal(e) =>
-        //        logError("Exception encountered", e)
         throw new IOException(e)
     }
   }

@@ -32,7 +32,7 @@ import org.apache.spark.util.collection.ExternalSorter
  */
 class CrailSparkShuffleSorter extends CrailShuffleSorter with Logging {
 
-  logInfo("rdfs shuffle spark sorter")
+  logInfo("crail shuffle spark sorter")
 
   override def sort[K, C](context: TaskContext, keyOrd: Ordering[K], ser : Serializer, inputSerializer: CrailDeserializationStream): Iterator[Product2[K, C]] = {
     val sorter =

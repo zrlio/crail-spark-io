@@ -343,11 +343,6 @@ class CrailStore () extends Logging {
 
   //---------------------------------------
 
-  def getDebug() : Boolean = {
-    return debug
-  }
-
-
   /* Register a shuffle with the manager and obtain a handle for it to pass to tasks. */
   def unregisterShuffle(shuffleId: Int) : Unit = {
     try {

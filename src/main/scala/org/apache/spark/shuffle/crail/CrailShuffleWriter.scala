@@ -40,20 +40,10 @@ class CrailShuffleWriter[K, V](
   private val blockManager = SparkEnv.get.blockManager
   private var stopping = false
   private val writeMetrics = context.taskMetrics().shuffleWriteMetrics
-  private val debug = CrailStore.get.getDebug()
   private val shuffleId = dep.shuffleId
   var start_init : Long = 0
   var serializerInstance = crailSerializer.newCrailSerializer(dep)
-
-  if (debug){
-    start_init = System.currentTimeMillis()
-  }
   private val shuffle : CrailShuffleWriterGroup = CrailStore.get.getWriterGroup(dep.shuffleId, dep.partitioner.numPartitions, serializerInstance, writeMetrics)
-  if (debug){
-    var end_init = System.currentTimeMillis()
-    val startTime = end_init - start_init
-    logInfo("### start writer, start time [ms] " + startTime)
-  }
 
 
   /** Write a bunch of records to this task's output */

@@ -28,22 +28,14 @@ import scala.reflect.ClassTag
 
 class CrailBroadcastFactory extends BroadcastFactory {
 
-//  logInfo("rdfs broadcast started, version 1")
-
   override def initialize(isDriver: Boolean, conf: SparkConf, securityMgr: SecurityManager) { }
 
   override def newBroadcast[T: ClassTag](value_ : T, isLocal: Boolean, id: Long) = {
     new CrailBroadcast[T](value_, id)
   }
 
-
   override def stop() { }
 
-  /**
-   * Remove all persisted state associated with the torrent broadcast with the given ID.
-   * @param removeFromDriver Whether to remove state from the driver.
-   * @param blocking Whether to block until unbroadcasted
-   */
   override def unbroadcast(id: Long, removeFromDriver: Boolean, blocking: Boolean) {
   }
 }
