@@ -52,7 +52,7 @@ class CrailShuffleReader[K, C](
     val deserializationStream = serializerInstance.deserializeCrailStream(multiStream)
     dep.keyOrdering match {
       case Some(keyOrd: Ordering[K]) =>
-      crailSorter.sort(context, keyOrd, dep.serializer, deserializationStream)
+        new CrailInputCloser(multiStream, crailSorter.sort(context, keyOrd, dep.serializer, deserializationStream))
       case None =>
         new CrailInputCloser(multiStream, deserializationStream.asKeyValueIterator.asInstanceOf[Iterator[Product2[K, C]]])
       }

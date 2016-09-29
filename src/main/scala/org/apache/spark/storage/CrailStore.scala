@@ -66,7 +66,6 @@ class CrailStore () extends Logging {
   var deleteOnClose : Boolean = _
   var deleteOnStart : Boolean = _
   var outstanding : Int = _
-  var sparkNameNode : String = _
   var preallocate : Int = 0
   var shuffleCycle : Int = _
   var writeAhead : Long = _
@@ -89,29 +88,21 @@ class CrailStore () extends Logging {
 
 
   private def init(): Unit = {
+    logInfo("CrailStore starting version 152")
+
     mapLocationAffinity = conf.getBoolean("spark.crail.shuffle.map.locationaffinity", true)
     deleteOnClose = conf.getBoolean("spark.crail.deleteonclose", false)
     deleteOnStart = conf.getBoolean("spark.crail.deleteonstart", true)
     outstanding = conf.getInt("spark.crail.shuffle.outstanding", 1)
-    sparkNameNode = conf.get("spark.externalBlockStore.url", "")
     preallocate = conf.getInt("spark.crail.preallocate", 0)
     shuffleCycle = conf.getInt("spark.crail.shuffleCycle", Int.MaxValue)
     writeAhead = conf.getLong("spark.crail.writeAhead", 0)
     debug = conf.getBoolean("spark.crail.debug", false)
 
-    if (sparkNameNode == ""){
-      logInfo("No CrailStore store configured")
-      fs = null
-      return
-    } else {
-      logInfo("CrailStore started, version 152")
-    }
-
     logInfo("spark.crail.shuffle.affinity " + mapLocationAffinity)
     logInfo("spark.crail.deleteonclose " + deleteOnClose)
     logInfo("spark.crail.deleteOnStart " + deleteOnStart)
     logInfo("spark.crail.shuffle.outstanding " + outstanding)
-    logInfo("spark.externalBlockStore.url " + sparkNameNode)
     logInfo("spark.crail.preallocate " + preallocate)
     logInfo("spark.crail.shuffleCycle " + shuffleCycle)
     logInfo("spark.crail.writeAhead " + writeAhead)
