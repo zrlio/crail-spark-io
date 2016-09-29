@@ -33,7 +33,7 @@ class CrailBroadcastFactory extends BroadcastFactory {
   override def initialize(isDriver: Boolean, conf: SparkConf, securityMgr: SecurityManager) { }
 
   override def newBroadcast[T: ClassTag](value_ : T, isLocal: Boolean, id: Long) = {
-    new RdfsBroadcast[T](value_, id)
+    new CrailBroadcast[T](value_, id)
   }
 
 

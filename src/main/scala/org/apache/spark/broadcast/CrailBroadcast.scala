@@ -31,7 +31,7 @@ import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
 
-private[spark] class RdfsBroadcast[T: ClassTag](obj: T, id: Long)
+private[spark] class CrailBroadcast[T: ClassTag](obj: T, id: Long)
   extends Broadcast[T](id) with Serializable {
   
   @transient private lazy val _value: T = readBroadcastBlock()
@@ -57,7 +57,7 @@ private[spark] class RdfsBroadcast[T: ClassTag](obj: T, id: Long)
   }
   
   private def readBroadcastBlock(): T = Utils.tryOrIOException {
-    RdfsBroadcast.synchronized {
+    CrailBroadcast.synchronized {
       CrailStore.get.getValues(broadcastId).map(new BlockResult(_, DataReadMethod.Memory, 32)).map(_.data.next()) match {
         case Some(x) =>
           val obj = x.asInstanceOf[T]
@@ -71,7 +71,7 @@ private[spark] class RdfsBroadcast[T: ClassTag](obj: T, id: Long)
   }
 }
 
-private object RdfsBroadcast {
+private object CrailBroadcast {
   
 }
 
