@@ -6,7 +6,7 @@ Spark-IO contains various I/O accleration plugins for Spark tailored to high-per
 
 * Spark 2.0.0
 * Java 8
-* RDMA-based network, e.g., Infiniband, iWARP, RoCE. There are two options to run Spark-IO without RDMA networking hardware: (a) use SoftiWARP, (b) us the TCP/DRAM storage tier
+* RDMA-based network, e.g., Infiniband, iWARP, RoCE. There are two options to run Spark-IO without RDMA networking hardware: (a) use [SoftiWARP](https://github.com/zrlio/softiwarp), (b) us the [TCP/DRAM storage tier](https://github.com/zrlio/crail-netty)
 
 ## Building 
 
