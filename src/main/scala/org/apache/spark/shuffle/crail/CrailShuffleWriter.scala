@@ -40,8 +40,6 @@ class CrailShuffleWriter[K, V](
   private val blockManager = SparkEnv.get.blockManager
   private var stopping = false
   private val writeMetrics = context.taskMetrics().shuffleWriteMetrics
-  private val shuffleId = dep.shuffleId
-  var start_init : Long = 0
   var serializerInstance = crailSerializer.newCrailSerializer(dep)
   private val shuffle : CrailShuffleWriterGroup = CrailStore.get.getWriterGroup(dep.shuffleId, dep.partitioner.numPartitions, serializerInstance, writeMetrics)
 
@@ -66,26 +64,28 @@ class CrailShuffleWriter[K, V](
   }
 
   /** Close this writer, passing along whether the map completed */
-  override def stop(initiallySuccess: Boolean): Option[MapStatus] = {
-    var success = initiallySuccess
-    var ret : Option[MapStatus] = None
-    if (stopping) {
-      return None
-    }
-    stopping = true
-    if (success) {
-      shuffle.flushSerializer()
-      shuffle.purgeStreams()
-      shuffle.syncStreams()
-      val sizes: Array[Long] = shuffle.writers.map { writer: CrailObjectWriter =>
-        writer.close()
-        writer.length
+  override def stop(success: Boolean): Option[MapStatus] = {
+    try {
+      if (stopping) {
+        return None
       }
-      ret = Some(MapStatus(blockManager.shuffleServerId, sizes))
+      stopping = true
+      if (success) {
+        shuffle.flushSerializer()
+        shuffle.purgeStreams()
+        shuffle.syncStreams()
+        val sizes: Array[Long] = shuffle.writers.map { writer: CrailObjectWriter =>
+          writer.close()
+          writer.length
+        }
+        return Some(MapStatus(blockManager.shuffleServerId, sizes))
+      } else {
+        return None
+      }
+    } finally {
+      if (shuffle != null && shuffle.writers != null) {
+        CrailStore.get.releaseWriterGroup(dep.shuffleId, shuffle)
+      }
     }
-    if (shuffle != null && shuffle.writers != null) {
-      CrailStore.get.releaseWriterGroup(shuffleId, blockManager.shuffleServerId, shuffle)
-    }
-    return ret
   }
 }

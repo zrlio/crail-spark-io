@@ -71,7 +71,7 @@ class CrailStore () extends Logging {
   var writeAhead : Long = _
   var debug : Boolean = _
   var hostHash : Int = 0
-  var mapReducePhase = new AtomicInteger(0)
+  var isMap : AtomicBoolean = new AtomicBoolean(true)
 
   var fs : CrailFS = _
   var fileCache : ConcurrentHashMap[String, CrailBlockFile] = _
@@ -335,29 +335,23 @@ class CrailStore () extends Logging {
         }
       }
 
-      fs.printStatistics("pre-close")
+      if (debug){
+        //request by map task, if first (still in reduce state) then print reduce stats
+        isMap.synchronized(
+          if (isMap.get()){
+            fs.printStatistics("map")
+          } else {
+            fs.printStatistics("reduce")
+          }
+        )
+      }
+
       fs.close()
       fs.printStatistics("close")
     }
   }
 
   //---------------------------------------
-
-  /* Register a shuffle with the manager and obtain a handle for it to pass to tasks. */
-  def unregisterShuffle(shuffleId: Int) : Unit = {
-    try {
-      if (shuffleId >= 0){
-        if (!shuffleExists(shuffleId)){
-          return
-        }
-        val shuffleIdDir = shuffleDir + "/shuffle_" + shuffleId
-        fs.delete(shuffleIdDir, true).get().syncDir()
-      }
-    } catch {
-      case e: Exception =>
-        logInfo("failed to unregister shuffle")
-    }
-  }
 
   /* Register a shuffle with the manager and obtain a handle for it to pass to tasks. */
   def registerShuffle(shuffleId: Int, numMaps: Int, partitions: Int) : Unit = {
@@ -391,60 +385,21 @@ class CrailStore () extends Logging {
     val executionTime = (end - start) / 1000.0
   }
 
-  def getWriterGroup(shuffleId: Int, numBuckets: Int, serializerInstance: CrailSerializerInstance, writeMetrics: ShuffleWriteMetrics) : CrailShuffleWriterGroup = {
-    streamGroupOpenStats.incrementAndGet()
-    var fileGroup = getFileGroup(shuffleId)
-    if (fileGroup == null){
-      fileGroupOpenStats.incrementAndGet()
-      val fileId = getShuffleFileId(shuffleId)
-      val futures: Array[Future[CrailFile]] = new Array[Future[CrailFile]](numBuckets)
-      for (i <- 0 until numBuckets){
-        val filename = shuffleDir + "/shuffle_" + shuffleId + "/part_" + i + "/" + fileId + "-" + executorId
-        futures(i) = fs.createFile(filename, 0, hostHash)
+  /* Register a shuffle with the manager and obtain a handle for it to pass to tasks. */
+  def unregisterShuffle(shuffleId: Int) : Unit = {
+    try {
+      if (shuffleId >= 0){
+        if (!shuffleExists(shuffleId)){
+          return
+        }
+        val shuffleIdDir = shuffleDir + "/shuffle_" + shuffleId
+        fs.delete(shuffleIdDir, true).get().syncDir()
       }
-      val files: Array[CrailFile] = new Array[CrailFile](numBuckets)
-      for (i <- 0 until numBuckets){
-        files(i) = futures(i).get()
-      }
-      fileGroup = new CrailFileGroup(shuffleId, executorId, fileId, files)
-    } else {
-      fileGroup.incCounter()
+    } catch {
+      case e: Exception =>
+        logInfo("failed to unregister shuffle")
     }
-
-    if (mapReducePhase.get() == 1){
-      if (mapReducePhase.compareAndSet(1, 0)){
-        fs.printStatistics("reduce")
-      }
-    }
-
-    val shuffleGroup = new CrailShuffleWriterGroup(fileGroup, shuffleId, serializerInstance, writeMetrics, writeAhead)
-    return shuffleGroup
   }
-
-  def getMultiStream(shuffleId: Int, reduceId: Int, numMaps:Int) : CrailMultiStream = {
-    if (mapReducePhase.get() == 0){
-      if (mapReducePhase.compareAndSet(0, 1)){
-        fs.printStatistics("map")
-        printStats()
-      }
-    }
-
-    val name = shuffleDir + "/shuffle_" + shuffleId + "/part_" + reduceId + "/"
-    val iter = fs.listEntries(name)
-    val multiStream = fs.getMultiStream(iter, outstanding)
-    multiStreamOpenStats.incrementAndGet()
-
-    return multiStream
-//    return new AutoCloseInputStream(multiStream)
-  }
-
-  def releaseWriterGroup(shuffleId: Int, serverId: BlockManagerId, writerGroup: CrailShuffleWriterGroup) : Unit = {
-    streamGroupCloseStats.incrementAndGet()
-    releaseFileGroup(shuffleId, writerGroup.fileGroup)
-  }
-
-
-  //------------
 
   private def getFileGroup(shuffleId: Int) : CrailFileGroup = {
     var shuffleStore = shuffleCache.get(shuffleId)
@@ -475,6 +430,64 @@ class CrailStore () extends Logging {
     }
     shuffleStore.add(fileGroup)
   }
+
+  def getWriterGroup(shuffleId: Int, numBuckets: Int, serializerInstance: CrailSerializerInstance, writeMetrics: ShuffleWriteMetrics) : CrailShuffleWriterGroup = {
+    if (debug){
+      //request by map task, if first (still in reduce state) then print reduce stats
+      isMap.synchronized(
+        if (isMap.compareAndSet(false, true)){
+          fs.printStatistics("reduce")
+        }
+      )
+    }
+
+    streamGroupOpenStats.incrementAndGet()
+    var fileGroup = getFileGroup(shuffleId)
+    if (fileGroup == null){
+      fileGroupOpenStats.incrementAndGet()
+      val fileId = getShuffleFileId(shuffleId)
+      val futures: Array[Future[CrailFile]] = new Array[Future[CrailFile]](numBuckets)
+      for (i <- 0 until numBuckets){
+        val filename = shuffleDir + "/shuffle_" + shuffleId + "/part_" + i + "/" + fileId + "-" + executorId
+        futures(i) = fs.createFile(filename, 0, hostHash)
+      }
+      val files: Array[CrailFile] = new Array[CrailFile](numBuckets)
+      for (i <- 0 until numBuckets){
+        files(i) = futures(i).get()
+      }
+      fileGroup = new CrailFileGroup(shuffleId, executorId, fileId, files)
+    } else {
+      fileGroup.incCounter()
+    }
+
+    val shuffleGroup = new CrailShuffleWriterGroup(fileGroup, shuffleId, serializerInstance, writeMetrics, writeAhead)
+    return shuffleGroup
+  }
+
+  def releaseWriterGroup(shuffleId: Int, writerGroup: CrailShuffleWriterGroup) : Unit = {
+    streamGroupCloseStats.incrementAndGet()
+    releaseFileGroup(shuffleId, writerGroup.fileGroup)
+  }
+
+  def getMultiStream(shuffleId: Int, reduceId: Int, numMaps:Int) : CrailMultiStream = {
+    if (debug){
+      //request by map task, if first (still in reduce state) then print reduce stats
+      isMap.synchronized(
+        if (isMap.compareAndSet(true, false)){
+          fs.printStatistics("map")
+        }
+      )
+    }
+
+    val name = shuffleDir + "/shuffle_" + shuffleId + "/part_" + reduceId + "/"
+    val iter = fs.listEntries(name)
+    val multiStream = fs.getMultiStream(iter, outstanding)
+    multiStreamOpenStats.incrementAndGet()
+
+    return multiStream
+  }
+
+  //------------
 
   private def getShuffleFileId(shuffleId: Int) : Int = {
     var counter = shuffleFileId.get(shuffleId)
