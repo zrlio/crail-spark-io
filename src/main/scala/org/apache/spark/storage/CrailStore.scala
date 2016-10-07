@@ -162,7 +162,7 @@ class CrailStore () extends Logging {
       var buf = bufferQueue.poll()
       while (buf != null){
         buf.clear()
-        fileStream.writeAsync(buf).get()
+        fileStream.write(buf).get()
         fs.freeBuffer(buf)
         buf = bufferQueue.poll()
       }

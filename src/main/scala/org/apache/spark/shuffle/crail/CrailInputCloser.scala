@@ -21,12 +21,12 @@
 
 package org.apache.spark.shuffle.crail
 
-import com.ibm.crail.CrailInputStream
+import com.ibm.crail.CrailMultiStream
 
 /**
  * Created by stu on 24.09.16.
  */
-class CrailInputCloser[K, C](stream: CrailInputStream, baseIter: Iterator[Product2[K, C]]) extends Iterator[Product2[K, C]]{
+class CrailInputCloser[K, C](stream: CrailMultiStream, baseIter: Iterator[Product2[K, C]]) extends Iterator[Product2[K, C]]{
 
 
   override def hasNext: Boolean = {
