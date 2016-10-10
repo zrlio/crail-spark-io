@@ -127,13 +127,13 @@ class CrailStore () extends Logging {
         if (baseDirExists){
           fs.delete(rootDir, true).get().syncDir()
         }
-        fs.createDir(rootDir).get().syncDir()
-        fs.createDir(broadcastDir).get().syncDir()
-        fs.createDir(shuffleDir).get().syncDir()
-        fs.createDir(rddDir).get().syncDir()
-        fs.createDir(tmpDir).get().syncDir()
-        fs.createDir(metaDir).get().syncDir()
-        fs.createDir(hostsDir).get().syncDir()
+        fs.makeDirectory(rootDir).get().syncDir()
+        fs.makeDirectory(broadcastDir).get().syncDir()
+        fs.makeDirectory(shuffleDir).get().syncDir()
+        fs.makeDirectory(rddDir).get().syncDir()
+        fs.makeDirectory(tmpDir).get().syncDir()
+        fs.makeDirectory(metaDir).get().syncDir()
+        fs.makeDirectory(hostsDir).get().syncDir()
         logInfo("creating main dir done " + rootDir)
       }
     }
@@ -362,18 +362,18 @@ class CrailStore () extends Logging {
     }
 
     initShuffleFileId(shuffleId)
-    val futureQueue = new LinkedBlockingQueue[Future[CrailFile]]()
+    val futureQueue = new LinkedBlockingQueue[Future[CrailDirectory]]()
     val start = System.currentTimeMillis()
     val shuffleIdDir = shuffleDir + "/shuffle_" + shuffleId
-    var future : Future[CrailFile] = fs.createDir(shuffleIdDir)
+    var future : Future[CrailDirectory] = fs.makeDirectory(shuffleIdDir)
     futureQueue.add(future)
     val i = 0
     for (i <- 0 until partitions){
       val subDir = shuffleIdDir + "/" + "part_" + i.toString
-      future = fs.createDir(subDir)
+      future = fs.makeDirectory(subDir)
       futureQueue.add(future)
     }
-    val fileQueue = new LinkedBlockingQueue[CrailFile]()
+    val fileQueue = new LinkedBlockingQueue[CrailDirectory]()
     while(!futureQueue.isEmpty){
       val file = futureQueue.poll().get()
       fileQueue.add(file)
@@ -480,8 +480,7 @@ class CrailStore () extends Logging {
     }
 
     val name = shuffleDir + "/shuffle_" + shuffleId + "/part_" + reduceId + "/"
-    val iter = fs.listEntries(name)
-    val multiStream = fs.getMultiStream(iter, outstanding)
+    val multiStream = fs.lookupDirectory(name).get().getMultiStream(outstanding)
     multiStreamOpenStats.incrementAndGet()
 
     return multiStream
