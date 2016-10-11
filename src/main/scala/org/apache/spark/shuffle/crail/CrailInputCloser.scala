@@ -26,7 +26,7 @@ import com.ibm.crail.CrailMultiStream
 /**
  * Created by stu on 24.09.16.
  */
-class CrailInputCloser[K, C](stream: CrailMultiStream, baseIter: Iterator[Product2[K, C]]) extends Iterator[Product2[K, C]]{
+class CrailInputCloser[K, C](deserializationStream: CrailDeserializationStream, baseIter: Iterator[Product2[K, C]]) extends Iterator[Product2[K, C]]{
 
 
   override def hasNext: Boolean = {
@@ -35,9 +35,12 @@ class CrailInputCloser[K, C](stream: CrailMultiStream, baseIter: Iterator[Produc
 
   override def next(): Product2[K, C] = {
     val product = baseIter.next()
-    if (stream.available() == 0){
-      stream.close()
-    }
+//    if (stream.available() == 0){
+//      stream.close()
+//    }
+    if (!hasNext) {
+      deserializationStream.close()
+    }    
     product
   }
 }
