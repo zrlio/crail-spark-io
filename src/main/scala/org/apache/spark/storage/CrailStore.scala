@@ -152,7 +152,8 @@ class CrailStore () extends Logging {
     try {
       logInfo("buffer cache warmup ")
       val tmpFile = tmpDir + "/" + Random.nextDouble()
-      var file = fs.createFile(tmpFile, 0, 0).get().syncDir()
+      var file = fs.createFile(tmpFile, 0, 0).get()
+      file.syncDir()
       var fileStream = file.getDirectOutputStream(0)
       val bufferQueue = new LinkedBlockingQueue[ByteBuffer]
       for( i <- 0 until preallocate){
