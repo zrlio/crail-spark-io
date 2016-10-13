@@ -449,7 +449,7 @@ class CrailStore () extends Logging {
       val fileId = getShuffleFileId(shuffleId)
       val futures: Array[Future[CrailFile]] = new Array[Future[CrailFile]](numBuckets)
       for (i <- 0 until numBuckets){
-        val filename = shuffleDir + "/shuffle_" + shuffleId + "/part_" + i + "/" + fileId + "-" + executorId
+        val filename = shuffleDir + "/shuffle_" + shuffleId + "/part_" + i + "/" + fileId + "-" + executorId + "-" + fs.getHostHash
         futures(i) = fs.createFile(filename, 0, hostHash)
       }
       val files: Array[CrailFile] = new Array[CrailFile](numBuckets)
