@@ -88,7 +88,7 @@ class CrailStore () extends Logging {
 
 
   private def init(): Unit = {
-    logInfo("CrailStore starting version 153")
+    logInfo("CrailStore starting version 154")
 
     mapLocationAffinity = conf.getBoolean("spark.crail.shuffle.map.locationaffinity", true)
     deleteOnClose = conf.getBoolean("spark.crail.deleteonclose", false)
@@ -647,7 +647,7 @@ private[spark] class CrailObjectWriter(directStream: CrailBufferedOutputStream, 
   override def close() {
     if (initialized) {
       initialized = false
-      finalPosition = directStream.getPos
+      finalPosition = directStream.position()
       directObjOut.close()
       directStream.close()
       hasBeenClosed = true
