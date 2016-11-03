@@ -100,10 +100,4 @@ class CrailSparkDeserializerStream(deserializerStream: DeserializationStream) ex
   override def available(): Int = {
     0
   }
-
-  override def valueSize(): Int = 0
-
-  override def keySize(): Int = 0
-
-  override def numElements(): Int = 0
 }
