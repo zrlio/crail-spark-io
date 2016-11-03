@@ -47,8 +47,6 @@ abstract class CrailSerializationStream extends SerializationStream {
 
 @DeveloperApi
 abstract class CrailDeserializationStream extends DeserializationStream {
-  def getFlatBuffer() : ByteBuffer
-  def keySize(): Int
-  def valueSize(): Int
-  def numElements(): Int
+  def read(buf: ByteBuffer) : Int
+  def available() : Int
 }

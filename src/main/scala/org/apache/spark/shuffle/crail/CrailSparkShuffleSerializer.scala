@@ -93,8 +93,12 @@ class CrailSparkDeserializerStream(deserializerStream: DeserializationStream) ex
     deserializerStream.close()
   }
 
-  override def getFlatBuffer(): ByteBuffer = {
-    null
+  override def read(buf: ByteBuffer): Int = {
+    0
+  }
+
+  override def available(): Int = {
+    0
   }
 
   override def valueSize(): Int = 0
