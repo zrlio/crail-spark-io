@@ -120,7 +120,7 @@ class CrailStore () extends Logging {
 
     if (executorId == "driver"){
       logInfo("creating main dir " + rootDir)
-      val baseDirExists : Boolean = fs.lookupFile(rootDir, false).get() != null
+      val baseDirExists : Boolean = fs.lookupNode(rootDir).get() != null
 
       if (!baseDirExists || deleteOnStart){
         logInfo("creating main dir " + rootDir)
@@ -193,7 +193,7 @@ class CrailStore () extends Logging {
       var fileInfo = crailFile.getFile()
       if (fileInfo == null) {
         val path = getPath(blockId)
-        fileInfo = fs.lookupFile(path, false).get()
+        fileInfo = fs.lookupNode(path).get().asFile()
         crailFile.update(fileInfo)
       }
       if (fileInfo != null){
@@ -223,7 +223,7 @@ class CrailStore () extends Logging {
         } catch {
           case e: Exception =>
             //            logInfo("file already created, fetching update " + blockId.name)
-            fileInfo = fs.lookupFile(path, false).get()
+            fileInfo = fs.lookupNode(path).get().asFile()
             crailFile.update(fileInfo)
         }
       }
@@ -248,7 +248,7 @@ class CrailStore () extends Logging {
         } catch {
           case e: Exception =>
             //            logInfo("file already created, fetching update " + blockId.name)
-            fileInfo = fs.lookupFile(path, false).get()
+            fileInfo = fs.lookupNode(path).get().asFile()
             crailFile.update(fileInfo)
         }
       }
@@ -262,7 +262,7 @@ class CrailStore () extends Logging {
       var fileInfo = crailFile.getFile()
       if (fileInfo == null){
         val path = getPath(blockId)
-        fileInfo = fs.lookupFile(path, false).get()
+        fileInfo = fs.lookupNode(path).get().asFile()
         crailFile.update(fileInfo)
       }
 
@@ -294,7 +294,7 @@ class CrailStore () extends Logging {
       var fileInfo = crailFile.getFile()
       if (fileInfo == null){
         val path = getPath(blockId)
-        fileInfo = fs.lookupFile(path, false).get()
+        fileInfo = fs.lookupNode(path).get().asFile()
         crailFile.update(fileInfo)
       }
 
@@ -316,7 +316,7 @@ class CrailStore () extends Logging {
       var fileInfo = crailFile.getFile()
       if (fileInfo == null){
         val path = getPath(blockId)
-        fileInfo = fs.lookupFile(path, false).get()
+        fileInfo = fs.lookupNode(path).get().asFile()
         crailFile.update(fileInfo)
       }
 
@@ -481,7 +481,7 @@ class CrailStore () extends Logging {
     }
 
     val name = shuffleDir + "/shuffle_" + shuffleId + "/part_" + reduceId + "/"
-    val multiStream = fs.lookupDirectory(name).get().getMultiStream(outstanding)
+    val multiStream = fs.lookupNode(name).get().asDirectory().getMultiStream(outstanding)
     multiStreamOpenStats.incrementAndGet()
 
     return multiStream
