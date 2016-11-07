@@ -327,6 +327,10 @@ class CrailStore () extends Logging {
     return ret
   }
 
+  def isDebug() : Boolean = {
+    return debug
+  }
+
   def shutdown(): Unit = {
     logInfo("stopping CrailStore")
     if (fs != null){
