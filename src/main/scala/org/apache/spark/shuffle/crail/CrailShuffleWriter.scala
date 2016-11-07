@@ -41,10 +41,12 @@ class CrailShuffleWriter[K, V](
   private var stopping = false
   private val writeMetrics = context.taskMetrics().shuffleWriteMetrics
   var serializerInstance = crailSerializer.newCrailSerializer(dep)
-  var startTime : Long = System.nanoTime() / 1000
+  var startTime : Double = System.nanoTime() / 1000
   private val shuffle : CrailShuffleWriterGroup = CrailStore.get.getWriterGroup(dep.shuffleId, dep.partitioner.numPartitions, serializerInstance, writeMetrics)
-  var initTime = (System.nanoTime()/1000) - startTime
-  var runTime : Long = 0
+  var initTime : Double = (System.nanoTime()/1000) - startTime
+  var runTime : Double = 0
+  var initRatio : Double = 0
+  var overhead : Double = 0
 
 
   /** Write a bunch of records to this task's output */
@@ -82,7 +84,9 @@ class CrailShuffleWriter[K, V](
           writer.length
         }
         runTime = (System.nanoTime()/1000) - startTime
-        logInfo("shuffler writer: initTime " + initTime + ", runTime " + runTime)
+        initRatio = runTime/initTime
+        overhead = 100/initRatio
+        logInfo("shuffler writer: initTime " + initTime + ", runTime " + runTime + ", initRatio " + initRatio + ", overhead " + overhead)
         return Some(MapStatus(blockManager.shuffleServerId, sizes))
       } else {
         return None
