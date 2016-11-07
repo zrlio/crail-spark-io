@@ -30,17 +30,27 @@ class CrailInputCloser[K, C](deserializationStream: CrailDeserializationStream, 
 
 
   override def hasNext: Boolean = {
-    baseIter.hasNext
+    val ret = baseIter.hasNext
+    if(!ret) {
+      deserializationStream.close()
+    }
+    ret
   }
 
   override def next(): Product2[K, C] = {
-    val product = baseIter.next()
-//    if (stream.available() == 0){
-//      stream.close()
-//    }
-    if (!hasNext) {
-      deserializationStream.close()
-    }    
-    product
+    baseIter.next()
   }
+
+
+//  override def hasNext: Boolean = {
+//    baseIter.hasNext
+//  }
+//
+//  override def next(): Product2[K, C] = {
+//    val product = baseIter.next()
+//    if (!hasNext) {
+//      deserializationStream.close()
+//    }
+//    product
+//  }
 }
