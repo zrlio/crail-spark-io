@@ -70,31 +70,23 @@ class CrailShuffleWriter[K, V](
 
   /** Close this writer, passing along whether the map completed */
   override def stop(success: Boolean): Option[MapStatus] = {
-    try {
-      if (stopping) {
-        return None
+    if (stopping) {
+      return None
+    }
+    stopping = true
+    if (success) {
+      shuffle.purge()
+      val sizes: Array[Long] = shuffle.writers.map { writer: CrailObjectWriter =>
+        writer.length
       }
-      stopping = true
-      if (success) {
-        shuffle.flushSerializer()
-        shuffle.purgeStreams()
-        shuffle.syncStreams()
-        val sizes: Array[Long] = shuffle.writers.map { writer: CrailObjectWriter =>
-          writer.close()
-          writer.length
-        }
-        runTime = (System.nanoTime()/1000) - startTime
-        initRatio = runTime/initTime
-        overhead = 100/initRatio
-        logInfo("shuffler writer: initTime " + initTime + ", runTime " + runTime + ", initRatio " + initRatio + ", overhead " + overhead)
-        return Some(MapStatus(blockManager.shuffleServerId, sizes))
-      } else {
-        return None
-      }
-    } finally {
-      if (shuffle != null && shuffle.writers != null) {
-        CrailStore.get.releaseWriterGroup(dep.shuffleId, shuffle)
-      }
+      shuffle.close()
+      runTime = (System.nanoTime()/1000) - startTime
+      initRatio = runTime/initTime
+      overhead = 100/initRatio
+      logInfo("shuffler writer: initTime " + initTime + ", runTime " + runTime + ", initRatio " + initRatio + ", overhead " + overhead)
+      return Some(MapStatus(blockManager.shuffleServerId, sizes))
+    } else {
+      return None
     }
   }
 }

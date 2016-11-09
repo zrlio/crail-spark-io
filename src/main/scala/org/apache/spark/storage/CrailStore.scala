@@ -88,7 +88,7 @@ class CrailStore () extends Logging {
 
 
   private def init(): Unit = {
-    logInfo("CrailStore starting version 155")
+    logInfo("CrailStore starting version 156")
 
     mapLocationAffinity = conf.getBoolean("spark.crail.shuffle.map.locationaffinity", true)
     deleteOnClose = conf.getBoolean("spark.crail.deleteonclose", false)
@@ -441,7 +441,7 @@ class CrailStore () extends Logging {
     }
 
     streamGroupOpenStats.incrementAndGet()
-    var fileGroup = getFileGroup(shuffleId, numBuckets)
+    val fileGroup = getFileGroup(shuffleId, numBuckets)
     val shuffleGroup = new CrailShuffleWriterGroup(fs, fileGroup, shuffleId, serializerInstance, writeMetrics, writeAhead)
     return shuffleGroup
   }
@@ -544,31 +544,33 @@ class CrailShuffleWriterGroup(val fs: CrailFS, val fileGroup: CrailFileGroup, sh
     writers(i) = new CrailObjectWriter(streams(i), serializerInstance, writeMetrics, shuffleId, i)
   }
 
-  def flushSerializer(): Unit = {
+  def purge(): Unit = {
     for (i <- 0 until writers.length){
       writers(i).flush()
     }
-  }
 
-  def purgeStreams(): Unit = {
-    val futureQueue = new LinkedBlockingQueue[Future[_]]()
+    val purgeQueue = new LinkedBlockingQueue[Future[_]]()
     for (i <- 0 until writers.length){
       val future = streams(i).purge()
-      futureQueue.add(future)
+      purgeQueue.add(future)
     }
-    while(!futureQueue.isEmpty){
-      futureQueue.poll().get()
+    while(!purgeQueue.isEmpty){
+      purgeQueue.poll().get()
+    }
+
+    val syncQueue = new LinkedBlockingQueue[Future[_]]()
+    for (i <- 0 until writers.length){
+      val future = streams(i).sync()
+      syncQueue.add(future)
+    }
+    while(!syncQueue.isEmpty){
+      syncQueue.poll().get()
     }
   }
 
-  def syncStreams(): Unit = {
-    val futureQueue = new LinkedBlockingQueue[Future[_]]()
+  def close(): Unit = {
     for (i <- 0 until writers.length){
-      val future = streams(i).sync()
-      futureQueue.add(future)
-    }
-    while(!futureQueue.isEmpty){
-      futureQueue.poll().get()
+      writers(i).close()
     }
   }
 }
