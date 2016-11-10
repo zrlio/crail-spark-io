@@ -79,7 +79,7 @@ class CrailShuffleWriter[K, V](
       val sizes: Array[Long] = shuffle.writers.map { writer: CrailObjectWriter =>
         writer.length
       }
-      shuffle.close()
+      CrailStore.get.releaseWriterGroup(dep.shuffleId, shuffle)
       runTime = (System.nanoTime()/1000) - startTime
       initRatio = runTime/initTime
       overhead = 100/initRatio

@@ -38,8 +38,9 @@ class CrailSparkShuffleSerializer() extends CrailShuffleSerializer {
 
 
 class CrailSparkShuffleSerializerInstance(val serializerInstance: SerializerInstance) extends CrailSerializerInstance {
+
   override def serializeCrailStream(s: CrailBufferedOutputStream): CrailSerializationStream = {
-    new CrailSparkSerializerStream(serializerInstance.serializeStream(s))
+    new CrailSparkSerializerStream(serializerInstance.serializeStream(s), s)
   }
 
   override def deserializeCrailStream(s: CrailMultiStream): CrailDeserializationStream = {
@@ -47,7 +48,7 @@ class CrailSparkShuffleSerializerInstance(val serializerInstance: SerializerInst
   }
 }
 
-class CrailSparkSerializerStream(serializerStream: SerializationStream) extends CrailSerializationStream {
+class CrailSparkSerializerStream(serializerStream: SerializationStream, crailStream: CrailBufferedOutputStream) extends CrailSerializationStream {
 
   override final def writeObject[T: ClassTag](t: T): SerializationStream = {
     serializerStream.writeObject(t)
@@ -71,6 +72,10 @@ class CrailSparkSerializerStream(serializerStream: SerializationStream) extends 
 
   override final def writeAll[T: ClassTag](iter: Iterator[T]): SerializationStream = {
     serializerStream.writeAll(iter)
+  }
+
+  def dataWritten() : Long = {
+    crailStream.position()
   }
 }
 
