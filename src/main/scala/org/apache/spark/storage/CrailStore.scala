@@ -75,8 +75,7 @@ class CrailStore () extends Logging {
 
   var fs : CrailFS = _
   var fileCache : ConcurrentHashMap[String, CrailBlockFile] = _
-  var shuffleCache: ConcurrentHashMap[Integer, LinkedBlockingQueue[CrailFileGroup]] = _
-  var shuffleFileId: ConcurrentHashMap[Integer, AtomicInteger] = _
+  var shuffleCache: ConcurrentHashMap[Integer, CrailShuffleStore] = _
 
   var fileGroupOpenStats = new AtomicLong(0)
   var streamGroupOpenStats = new AtomicLong(0)
@@ -88,7 +87,7 @@ class CrailStore () extends Logging {
 
 
   private def init(): Unit = {
-    logInfo("CrailStore starting version 156")
+    logInfo("CrailStore starting version 158")
 
     mapLocationAffinity = conf.getBoolean("spark.crail.shuffle.map.locationaffinity", true)
     deleteOnClose = conf.getBoolean("spark.crail.deleteonclose", false)
@@ -111,8 +110,7 @@ class CrailStore () extends Logging {
     val crailConf = new CrailConfiguration();
     fs = CrailFS.newInstance(crailConf)
     fileCache = new ConcurrentHashMap[String, CrailBlockFile]()
-    shuffleCache = new ConcurrentHashMap[Integer, LinkedBlockingQueue[CrailFileGroup]]()
-    shuffleFileId = new ConcurrentHashMap[Integer, AtomicInteger]()
+    shuffleCache = new ConcurrentHashMap[Integer, CrailShuffleStore]()
 
     if (mapLocationAffinity){
       hostHash = fs.getHostHash
@@ -362,11 +360,12 @@ class CrailStore () extends Logging {
   def registerShuffle(shuffleId: Int, numMaps: Int, partitions: Int) : Unit = {
     //    logInfo("registering shuffle " + shuffleId + ", time " + ", cacheSize " + fs.getCacheSize)
     unregisterShuffle(shuffleId - shuffleCycle)
-    if (shuffleExists(shuffleId)){
+    if (shuffleCache.contains(shuffleId)){
       return
     }
 
-    initShuffleFileId(shuffleId)
+    val shuffleStore = new CrailShuffleStore
+    val oldStore = shuffleCache.putIfAbsent(shuffleId, shuffleStore)
     val futureQueue = new LinkedBlockingQueue[Future[CrailDirectory]]()
     val start = System.currentTimeMillis()
     val shuffleIdDir = shuffleDir + "/shuffle_" + shuffleId
@@ -394,11 +393,12 @@ class CrailStore () extends Logging {
   def unregisterShuffle(shuffleId: Int) : Unit = {
     try {
       if (shuffleId >= 0){
-        if (!shuffleExists(shuffleId)){
+        if (!shuffleCache.contains(shuffleId)){
           return
         }
         val shuffleIdDir = shuffleDir + "/shuffle_" + shuffleId
         fs.delete(shuffleIdDir, true).get().syncDir()
+        shuffleCache.remove(shuffleId)
       }
     } catch {
       case e: Exception =>
@@ -409,38 +409,20 @@ class CrailStore () extends Logging {
   private def getFileGroup(shuffleId: Int, numBuckets: Int) : CrailFileGroup = {
     var shuffleStore = shuffleCache.get(shuffleId)
     if (shuffleStore == null){
-      shuffleStore = new LinkedBlockingQueue[CrailFileGroup]
+      shuffleStore = new CrailShuffleStore
       val oldStore = shuffleCache.putIfAbsent(shuffleId, shuffleStore)
       if (oldStore != null){
         shuffleStore = oldStore
       }
     }
 
-    var fileGroup : CrailFileGroup = shuffleStore.poll()
-    if (fileGroup == null){
-      shuffleStore.synchronized {
-        fileGroup = shuffleStore.poll()
-        if (fileGroup == null) {
-          fileGroupOpenStats.incrementAndGet()
-          val futures: Array[Upcoming[CrailFile]] = new Array[Upcoming[CrailFile]](numBuckets)
-          for (i <- 0 until numBuckets) {
-            val filename = shuffleDir + "/shuffle_" + shuffleId + "/part_" + i + "/" + executorId + "-" + fs.getHostHash
-            futures(i) = fs.createFile(filename, 0, hostHash)
-          }
-          val files: Array[CrailFile] = new Array[CrailFile](numBuckets)
-          for (i <- 0 until numBuckets) {
-            files(i) = futures(i).early()
-          }
-          fileGroup = new CrailFileGroup(shuffleId, executorId, files)
-        }
-      }
-    }
+    var fileGroup : CrailFileGroup = shuffleStore.getFileGroup(shuffleId, executorId, numBuckets, shuffleDir, fs, hostHash)
     return fileGroup
   }
 
   private def releaseFileGroup(shuffleId: Int, fileGroup: CrailFileGroup) = {
     var shuffleStore = shuffleCache.get(shuffleId)
-    shuffleStore.add(fileGroup)
+    shuffleStore.releaseFileGroup(fileGroup)
   }
 
   def getWriterGroup(shuffleId: Int, numBuckets: Int, serializerInstance: CrailSerializerInstance, writeMetrics: ShuffleWriteMetrics) : CrailShuffleWriterGroup = {
@@ -484,27 +466,6 @@ class CrailStore () extends Logging {
 
   //------------
 
-  private def getShuffleFileId(shuffleId: Int) : Int = {
-    var counter = shuffleFileId.get(shuffleId)
-    if (counter == null){
-      counter = new AtomicInteger(0)
-      val oldCounter = shuffleFileId.putIfAbsent(shuffleId, counter)
-      if (oldCounter != null){
-        counter = oldCounter
-      }
-    }
-    return counter.incrementAndGet()
-  }
-
-  private def initShuffleFileId(shuffleId: Int) = {
-    shuffleFileId.putIfAbsent(shuffleId, new AtomicInteger(0))
-  }
-
-  private def shuffleExists(shuffleId: Int) : Boolean = {
-    return shuffleFileId.contains(shuffleId)
-  }
-
-
   private def getLock(blockId: BlockId) : CrailBlockFile = {
     var crailFile = fileCache.get(blockId.name)
     if (crailFile == null){
@@ -537,15 +498,38 @@ class CrailStore () extends Logging {
   }
 }
 
-class CrailFileGroup(val shuffleId: Int, val executorId: String, val writers: Array[CrailFile]){
-  var counter = 0
+class CrailFileGroup(val shuffleId: Int, val executorId: String, val fileId: Int, val writers: Array[CrailFile]){
+}
 
-  def incCounter() = {
-    counter = counter + 1
+class CrailShuffleStore{
+  var store: LinkedBlockingQueue[CrailFileGroup] = new LinkedBlockingQueue[CrailFileGroup]()
+  var size : AtomicInteger = new AtomicInteger(0)
+
+  def getFileGroup(shuffleId: Int, executorId: String, numBuckets: Int, shuffleDir: String, fs: CrailFS, hostHash: Int) : CrailFileGroup = {
+    var fileGroup = store.poll()
+    if (fileGroup == null){
+      store.synchronized{
+        fileGroup = store.poll()
+        if (fileGroup == null){
+          val coreId = size.getAndIncrement()
+          val futures: Array[Upcoming[CrailFile]] = new Array[Upcoming[CrailFile]](numBuckets)
+          for (i <- 0 until numBuckets) {
+            val filename = shuffleDir + "/shuffle_" + shuffleId + "/part_" + i + "/" + coreId + "-" + executorId + "-" + fs.getHostHash
+            futures(i) = fs.createFile(filename, 0, hostHash)
+          }
+          val files: Array[CrailFile] = new Array[CrailFile](numBuckets)
+          for (i <- 0 until numBuckets) {
+            files(i) = futures(i).early()
+          }
+          fileGroup = new CrailFileGroup(shuffleId, executorId, coreId, files)
+        }
+      }
+    }
+    return fileGroup
   }
 
-  def getCounter() : Int = {
-    return counter
+  def releaseFileGroup(fileGroup: CrailFileGroup) : Unit = {
+    store.add(fileGroup)
   }
 }
 
