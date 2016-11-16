@@ -76,9 +76,7 @@ class CrailShuffleWriter[K, V](
     stopping = true
     if (success) {
       shuffle.purge()
-      val sizes: Array[Long] = shuffle.writers.map { writer: CrailObjectWriter =>
-        writer.length
-      }
+      val sizes: Array[Long] = shuffle.writers.map {writer => writer.length }
       CrailStore.get.releaseWriterGroup(dep.shuffleId, shuffle)
       runTime = (System.nanoTime()/1000) - startTime
       initRatio = runTime/initTime

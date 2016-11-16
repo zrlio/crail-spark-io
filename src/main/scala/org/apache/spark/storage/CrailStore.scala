@@ -21,17 +21,16 @@
 
 package org.apache.spark.storage
 
-import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicLong}
-import java.util.concurrent.{ConcurrentHashMap, Future, LinkedBlockingQueue}
+import java.util.concurrent.{ConcurrentHashMap, Future, LinkedBlockingQueue, TimeUnit}
 
 import com.ibm.crail._
 import com.ibm.crail.conf.CrailConfiguration
+import com.ibm.crail.utils.CrailImmediateOperation
 import org.apache.spark._
 import org.apache.spark.common._
 import org.apache.spark.executor.ShuffleWriteMetrics
-import org.apache.spark.serializer.SerializationStream
 import org.apache.spark.shuffle.crail.{CrailSerializationStream, CrailSerializerInstance}
 
 import scala.util.Random
@@ -619,6 +618,8 @@ private[spark] class CrailObjectWriter(file: CrailFile, serializerInstance: Crai
   private var hasBeenClosed = false
   private var crailStream : CrailBufferedOutputStream = null
   private var serializationStream: CrailSerializationStream = null
+  private val noPurge : CrailImmediateOperation = new CrailImmediateOperation(0)
+  private val noSync : NoSync = new NoSync()
 
   def open(): CrailObjectWriter = {
     if (hasBeenClosed) {
@@ -652,20 +653,42 @@ private[spark] class CrailObjectWriter(file: CrailFile, serializerInstance: Crai
   }
 
   def length() : Long = {
-    return crailStream.position()
+    if (initialized) {
+      return crailStream.position()
+    } else {
+      return 0
+    }
   }
 
   def flushSerializer() {
-    serializationStream.flush()
+    if (initialized) {
+      serializationStream.flush()
+    }
   }
 
   def purgeStream() : Future[CrailResult] = {
-    crailStream.purge()
+    if (initialized) {
+      crailStream.purge()
+    } else {
+      return noPurge
+    }
   }
 
   def syncStream() : Future[Void] = {
-    crailStream.sync()
+    if (initialized) {
+      crailStream.sync()
+    } else {
+      return noSync
+    }
   }
+}
+
+class NoSync extends Future[Void] {
+  override def isCancelled: Boolean = false
+  override def get(): Void = null
+  override def get(timeout: Long, unit: TimeUnit): Void = null
+  override def cancel(mayInterruptIfRunning: Boolean): Boolean = false
+  override def isDone: Boolean = true
 }
 
 
