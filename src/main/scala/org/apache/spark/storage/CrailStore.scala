@@ -86,7 +86,7 @@ class CrailStore () extends Logging {
 
 
   private def init(): Unit = {
-    logInfo("CrailStore starting version 158")
+    logInfo("CrailStore starting version 159")
 
     mapLocationAffinity = conf.getBoolean("spark.crail.shuffle.map.locationaffinity", true)
     deleteOnClose = conf.getBoolean("spark.crail.deleteonclose", false)
@@ -571,9 +571,7 @@ class CrailShuffleWriterGroup(val fs: CrailFS, val fileGroup: CrailFileGroup, sh
 
   def close(): Unit = {
     for (i <- 0 until writers.length){
-      if (writers(i).isOpen){
-        writers(i).close()
-      }
+      writers(i).close()
     }
   }
 }
@@ -636,6 +634,8 @@ private[spark] class CrailObjectWriter(file: CrailFile, serializerInstance: Crai
       initialized = false
       serializationStream.close()
       hasBeenClosed = true
+    } else {
+      file.syncDir()
     }
   }
 
