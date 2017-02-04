@@ -20,7 +20,36 @@
     <encoding>UTF-8</encoding>
     <scala.version>2.11.8</scala.version>
     <scala.compat.version>2.11</scala.compat.version>
+    <spark.version>2.0.0</spark.version>
   </properties>
+
+  <profiles>
+    <profile>
+      <id>spark-2.0.0</id>
+      <properties>
+        <spark.version>2.0.0</spark.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>spark-2.0.1</id>
+      <properties>
+        <spark.version>2.0.1</spark.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>spark-2.0.2</id>
+      <properties>
+        <spark.version>2.0.2</spark.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>spark-2.1.0</id>
+      <properties>
+        <spark.version>2.1.0</spark.version>
+      </properties>
+    </profile>
+  </profiles>
+
 
   <dependencies>
     <dependency>
@@ -31,7 +60,7 @@
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_2.11</artifactId>
-      <version>2.0.0</version>
+      <version>${spark.version}</version>
     </dependency>
     <dependency>
       <groupId>org.json4s</groupId>
