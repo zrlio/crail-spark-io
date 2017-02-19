@@ -98,6 +98,14 @@ class CrailSparkDeserializerStream(deserializerStream: DeserializationStream) ex
     deserializerStream.close()
   }
 
+  override def asIterator : scala.Iterator[scala.Any] = {
+    return deserializerStream.asIterator
+  }
+
+  override def asKeyValueIterator : scala.Iterator[scala.Tuple2[scala.Any, scala.Any]] = {
+    return deserializerStream.asKeyValueIterator
+  }
+
   override def read(buf: ByteBuffer): Int = {
     0
   }
