@@ -373,12 +373,12 @@ class CrailStore () extends Logging {
     val i = 0
     for (i <- 0 until partitions){
       val subDir = shuffleIdDir + "/" + "part_" + i.toString
-      future = fs.create(subDir, CrailNodeType.DIRECTORY, 0, 0)
+      future = fs.create(subDir, CrailNodeType.MULTIFILE, 0, 0)
       futureQueue.add(future)
     }
-    val fileQueue = new LinkedBlockingQueue[CrailDirectory]()
+    val fileQueue = new LinkedBlockingQueue[CrailMultiFile]()
     while(!futureQueue.isEmpty){
-      val file = futureQueue.poll().get().asDirectory()
+      val file = futureQueue.poll().get().asMultiFile()
       fileQueue.add(file)
     }
     while(!fileQueue.isEmpty){
