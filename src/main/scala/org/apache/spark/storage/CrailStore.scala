@@ -117,20 +117,20 @@ class CrailStore () extends Logging {
 
     if (executorId == "driver"){
       logInfo("creating main dir " + rootDir)
-      val baseDirExists : Boolean = fs.lookupNode(rootDir).get() != null
+      val baseDirExists : Boolean = fs.lookup(rootDir).get() != null
 
       if (!baseDirExists || deleteOnStart){
         logInfo("creating main dir " + rootDir)
         if (baseDirExists){
           fs.delete(rootDir, true).get().syncDir()
         }
-        fs.makeDirectory(rootDir).get().syncDir()
-        fs.makeDirectory(broadcastDir).get().syncDir()
-        fs.makeDirectory(shuffleDir).get().syncDir()
-        fs.makeDirectory(rddDir).get().syncDir()
-        fs.makeDirectory(tmpDir).get().syncDir()
-        fs.makeDirectory(metaDir).get().syncDir()
-        fs.makeDirectory(hostsDir).get().syncDir()
+        fs.create(rootDir, CrailNodeType.DIRECTORY, 0, 0).get().syncDir()
+        fs.create(broadcastDir, CrailNodeType.DIRECTORY, 0, 0).get().syncDir()
+        fs.create(shuffleDir, CrailNodeType.DIRECTORY, 0, 0).get().syncDir()
+        fs.create(rddDir, CrailNodeType.DIRECTORY, 0, 0).get().syncDir()
+        fs.create(tmpDir, CrailNodeType.DIRECTORY, 0, 0).get().syncDir()
+        fs.create(metaDir, CrailNodeType.DIRECTORY, 0, 0).get().syncDir()
+        fs.create(hostsDir, CrailNodeType.DIRECTORY, 0, 0).get().syncDir()
         logInfo("creating main dir done " + rootDir)
       }
     }
@@ -138,7 +138,7 @@ class CrailStore () extends Logging {
     try {
       val hostFile = hostsDir + "/" + fs.getHostHash
       logInfo("creating hostFile " + hostFile)
-      fs.createFile(hostFile, 0, 0).get().syncDir()
+      fs.create(hostFile, CrailNodeType.DATAFILE, 0, 0).get().syncDir()
       logInfo("creating hostFile done " + hostFile)
     } catch {
       case e: Exception =>
@@ -149,7 +149,7 @@ class CrailStore () extends Logging {
     try {
       logInfo("buffer cache warmup ")
       val tmpFile = tmpDir + "/" + Random.nextDouble()
-      var file = fs.createFile(tmpFile, 0, 0).get()
+      var file = fs.create(tmpFile, CrailNodeType.DATAFILE, 0, 0).get().asFile()
       file.syncDir()
       var fileStream = file.getDirectOutputStream(0)
       val bufferQueue = new LinkedBlockingQueue[ByteBuffer]
@@ -173,8 +173,8 @@ class CrailStore () extends Logging {
         e.printStackTrace()
     }
 
-    fs.printStatistics("init")
-    fs.resetStatistics()
+    fs.getStatistics.print("init")
+    fs.getStatistics.reset()
   }
 
   def removeBlock(blockId: BlockId): Boolean = {
@@ -190,7 +190,7 @@ class CrailStore () extends Logging {
       var fileInfo = crailFile.getFile()
       if (fileInfo == null) {
         val path = getPath(blockId)
-        fileInfo = fs.lookupNode(path).get().asFile()
+        fileInfo = fs.lookup(path).get().asFile()
         crailFile.update(fileInfo)
       }
       if (fileInfo != null){
@@ -208,7 +208,7 @@ class CrailStore () extends Logging {
         //        logInfo("fresh file, writing " + blockId.name)
         val path = getPath(blockId)
         try {
-          fileInfo = fs.createFile(path, 0, 0).get()
+          fileInfo = fs.create(path, CrailNodeType.DATAFILE, 0, 0).get().asFile()
           if (fileInfo != null && fileInfo.getCapacity() == 0) {
             val stream = fileInfo.getBufferedOutputStream(0)
             val byteBuffer = bytes.duplicate()
@@ -220,7 +220,7 @@ class CrailStore () extends Logging {
         } catch {
           case e: Exception =>
             //            logInfo("file already created, fetching update " + blockId.name)
-            fileInfo = fs.lookupNode(path).get().asFile()
+            fileInfo = fs.lookup(path).get().asFile()
             crailFile.update(fileInfo)
         }
       }
@@ -234,7 +234,7 @@ class CrailStore () extends Logging {
       if (fileInfo == null || (fileInfo != null && fileInfo.getToken() == 0)) {
         val path = getPath(blockId)
         try {
-          fileInfo = fs.createFile(path, 0, 0).get()
+          fileInfo = fs.create(path, CrailNodeType.DATAFILE, 0, 0).get().asFile()
           if (fileInfo != null && fileInfo.getCapacity() == 0) {
             val stream = fileInfo.getBufferedOutputStream(0)
             val instance = serializer.newInstance()
@@ -245,7 +245,7 @@ class CrailStore () extends Logging {
         } catch {
           case e: Exception =>
             //            logInfo("file already created, fetching update " + blockId.name)
-            fileInfo = fs.lookupNode(path).get().asFile()
+            fileInfo = fs.lookup(path).get().asFile()
             crailFile.update(fileInfo)
         }
       }
@@ -259,7 +259,7 @@ class CrailStore () extends Logging {
       var fileInfo = crailFile.getFile()
       if (fileInfo == null){
         val path = getPath(blockId)
-        fileInfo = fs.lookupNode(path).get().asFile()
+        fileInfo = fs.lookup(path).get().asFile()
         crailFile.update(fileInfo)
       }
 
@@ -291,7 +291,7 @@ class CrailStore () extends Logging {
       var fileInfo = crailFile.getFile()
       if (fileInfo == null){
         val path = getPath(blockId)
-        fileInfo = fs.lookupNode(path).get().asFile()
+        fileInfo = fs.lookup(path).get().asFile()
         crailFile.update(fileInfo)
       }
 
@@ -313,7 +313,7 @@ class CrailStore () extends Logging {
       var fileInfo = crailFile.getFile()
       if (fileInfo == null){
         val path = getPath(blockId)
-        fileInfo = fs.lookupNode(path).get().asFile()
+        fileInfo = fs.lookup(path).get().asFile()
         crailFile.update(fileInfo)
       }
 
@@ -341,15 +341,15 @@ class CrailStore () extends Logging {
         //request by map task, if first (still in reduce state) then print reduce stats
         isMap.synchronized(
           if (isMap.get()){
-            fs.printStatistics("map")
+            fs.getStatistics.print("map")
           } else {
-            fs.printStatistics("reduce")
+            fs.getStatistics.print("reduce")
           }
         )
       }
 
       fs.close()
-      fs.printStatistics("close")
+      fs.getStatistics.print("close")
     }
   }
 
@@ -365,20 +365,20 @@ class CrailStore () extends Logging {
 
     val shuffleStore = new CrailShuffleStore
     val oldStore = shuffleCache.putIfAbsent(shuffleId, shuffleStore)
-    val futureQueue = new LinkedBlockingQueue[Future[CrailDirectory]]()
+    val futureQueue = new LinkedBlockingQueue[Future[CrailNode]]()
     val start = System.currentTimeMillis()
     val shuffleIdDir = shuffleDir + "/shuffle_" + shuffleId
-    var future : Future[CrailDirectory] = fs.makeDirectory(shuffleIdDir)
+    var future : Future[CrailNode] = fs.create(shuffleIdDir, CrailNodeType.DIRECTORY, 0, 0)
     futureQueue.add(future)
     val i = 0
     for (i <- 0 until partitions){
       val subDir = shuffleIdDir + "/" + "part_" + i.toString
-      future = fs.makeDirectory(subDir)
+      future = fs.create(subDir, CrailNodeType.DIRECTORY, 0, 0)
       futureQueue.add(future)
     }
     val fileQueue = new LinkedBlockingQueue[CrailDirectory]()
     while(!futureQueue.isEmpty){
-      val file = futureQueue.poll().get()
+      val file = futureQueue.poll().get().asDirectory()
       fileQueue.add(file)
     }
     while(!fileQueue.isEmpty){
@@ -429,7 +429,7 @@ class CrailStore () extends Logging {
       //request by map task, if first (still in reduce state) then print reduce stats
       isMap.synchronized(
         if (isMap.compareAndSet(false, true)){
-          fs.printStatistics("reduce")
+          fs.getStatistics.print("reduce")
         }
       )
     }
@@ -451,13 +451,13 @@ class CrailStore () extends Logging {
       //request by map task, if first (still in reduce state) then print reduce stats
       isMap.synchronized(
         if (isMap.compareAndSet(true, false)){
-          fs.printStatistics("map")
+          fs.getStatistics.print("map")
         }
       )
     }
 
     val name = shuffleDir + "/shuffle_" + shuffleId + "/part_" + reduceId + "/"
-    val multiStream = fs.lookupNode(name).get().asDirectory().getMultiStream(outstanding)
+    val multiStream = fs.lookup(name).get().asMultiFile().getMultiStream(outstanding)
     multiStreamOpenStats.incrementAndGet()
 
     return multiStream
@@ -497,7 +497,7 @@ class CrailStore () extends Logging {
   }
 }
 
-class CrailFileGroup(val shuffleId: Int, val executorId: String, val fileId: Int, val writers: Array[CrailFile]){
+class CrailFileGroup(val shuffleId: Int, val executorId: String, val fileId: Int, val writers: Array[CrailNode]){
 }
 
 class CrailShuffleStore{
@@ -511,12 +511,12 @@ class CrailShuffleStore{
         fileGroup = store.poll()
         if (fileGroup == null){
           val coreId = size.getAndIncrement()
-          val futures: Array[Upcoming[CrailFile]] = new Array[Upcoming[CrailFile]](numBuckets)
+          val futures: Array[Upcoming[CrailNode]] = new Array[Upcoming[CrailNode]](numBuckets)
           for (i <- 0 until numBuckets) {
             val filename = shuffleDir + "/shuffle_" + shuffleId + "/part_" + i + "/" + coreId + "-" + executorId + "-" + fs.getHostHash
-            futures(i) = fs.createFile(filename, 0, hostHash)
+            futures(i) = fs.create(filename, CrailNodeType.DATAFILE, 0, hostHash)
           }
-          val files: Array[CrailFile] = new Array[CrailFile](numBuckets)
+          val files: Array[CrailNode] = new Array[CrailNode](numBuckets)
           for (i <- 0 until numBuckets) {
             files(i) = futures(i).early()
           }
@@ -609,7 +609,7 @@ object CrailStore extends Logging {
   }
 }
 
-private[spark] class CrailObjectWriter(file: CrailFile, serializerInstance: CrailSerializerInstance, writeMetrics: ShuffleWriteMetrics, shuffleId: Int, reduceId: Int, writeHint: Long)
+private[spark] class CrailObjectWriter(file: CrailNode, serializerInstance: CrailSerializerInstance, writeMetrics: ShuffleWriteMetrics, shuffleId: Int, reduceId: Int, writeHint: Long)
   extends Logging
 {
   private var initialized = false
@@ -623,7 +623,7 @@ private[spark] class CrailObjectWriter(file: CrailFile, serializerInstance: Crai
     if (hasBeenClosed) {
       throw new IllegalStateException("Writer already closed. Cannot be reopened.")
     }
-    crailStream = file.getBufferedOutputStream(writeHint)
+    crailStream = file.asFile().getBufferedOutputStream(writeHint)
     serializationStream = serializerInstance.serializeCrailStream(crailStream)
     initialized = true
     this
