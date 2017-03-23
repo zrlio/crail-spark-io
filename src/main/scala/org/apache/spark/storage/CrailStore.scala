@@ -86,7 +86,7 @@ class CrailStore () extends Logging {
 
 
   private def init(): Unit = {
-    logInfo("CrailStore starting version 159")
+    logInfo("CrailStore starting version 280")
 
     mapLocationAffinity = conf.getBoolean("spark.crail.shuffle.map.locationaffinity", true)
     deleteOnClose = conf.getBoolean("spark.crail.deleteonclose", false)
@@ -376,9 +376,9 @@ class CrailStore () extends Logging {
       future = fs.create(subDir, CrailNodeType.MULTIFILE, 0, 0)
       futureQueue.add(future)
     }
-    val fileQueue = new LinkedBlockingQueue[CrailMultiFile]()
+    val fileQueue = new LinkedBlockingQueue[CrailNode]()
     while(!futureQueue.isEmpty){
-      val file = futureQueue.poll().get().asMultiFile()
+      val file = futureQueue.poll().get()
       fileQueue.add(file)
     }
     while(!fileQueue.isEmpty){
