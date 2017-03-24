@@ -86,7 +86,7 @@ class CrailStore () extends Logging {
 
 
   private def init(): Unit = {
-    logInfo("CrailStore starting version 280")
+    logInfo("CrailStore starting version 281")
 
     mapLocationAffinity = conf.getBoolean("spark.crail.shuffle.map.locationaffinity", true)
     deleteOnClose = conf.getBoolean("spark.crail.deleteonclose", false)
@@ -518,7 +518,8 @@ class CrailShuffleStore{
           }
           val files: Array[CrailNode] = new Array[CrailNode](numBuckets)
           for (i <- 0 until numBuckets) {
-            files(i) = futures(i).early()
+            files(i) = futures(i).get()
+//            files(i) = futures(i).early()
           }
           fileGroup = new CrailFileGroup(shuffleId, executorId, coreId, files)
         }
