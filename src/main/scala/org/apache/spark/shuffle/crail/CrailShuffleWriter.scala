@@ -62,8 +62,13 @@ class CrailShuffleWriter[K, V](
       records
     }
 
+    var x = 0L
     for (elem <- iter) {
       val bucketId = dep.partitioner.getPartition(elem._1)
+      if( x < 100) {
+        logInfo("bucketId " + bucketId + ", path " + shuffle.writers(bucketId).getPath)
+        x=x+1
+      }
       shuffle.writers(bucketId).write(elem._1, elem._2)
     }
   }

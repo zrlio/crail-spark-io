@@ -653,6 +653,13 @@ private[spark] class CrailObjectWriter(file: CrailNode, serializerInstance: Crai
     serializationStream.writeValue(value)
   }
 
+  def getPath() : String = {
+    if (!initialized) {
+      open()
+    }
+    file.getPath
+  }
+
   def length() : Long = {
     if (initialized) {
       return crailStream.position()
