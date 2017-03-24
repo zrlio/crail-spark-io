@@ -518,8 +518,7 @@ class CrailShuffleStore{
           }
           val files: Array[CrailNode] = new Array[CrailNode](numBuckets)
           for (i <- 0 until numBuckets) {
-            files(i) = futures(i).get()
-//            files(i) = futures(i).early()
+            files(i) = futures(i).early()
           }
           fileGroup = new CrailFileGroup(shuffleId, executorId, coreId, files)
         }
@@ -651,13 +650,6 @@ private[spark] class CrailObjectWriter(file: CrailNode, serializerInstance: Crai
 
     serializationStream.writeKey(key)
     serializationStream.writeValue(value)
-  }
-
-  def getPath() : String = {
-    if (!initialized) {
-      open()
-    }
-    file.getPath
   }
 
   def length() : Long = {
