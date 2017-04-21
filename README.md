@@ -16,12 +16,13 @@ To build Crail execute the following steps:
 1. Obtain a copy of [Spark-IO](https://github.com/zrlio/spark-io) from Github
 2. Make sure your local maven repo contains [Crail](https://github.com/zrlio/crail), if not build Crail from Github
 4. Run: mvn -DskipTests install
-5. Copy spark-io-1.0.jar as well as its dependencies to the Spark jars folder
+5. Add spark-io-1.0.jar as well as its Crail dependencies to the extra class path in Spark, both for the driver and the executors
 
 ```
-    cd spark-io
-    cp target/spark-io-1.0-dist/jars $SPARK_HOME/jars/
+spark.driver.extraClassPath     $CRAIL_HOME/jars/*:<path>/spark-io.jar:.
+spark.executor.extraClassPath   $CRAIL_HOME/jars/*:<path>/spark-io.jar:.
 ```
+
 ## Configuration
 
 To configure the crail shuffle plugin included in spark-io add the following line to spark-defaults.conf
