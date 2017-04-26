@@ -52,19 +52,38 @@ private[spark] class CrailBroadcast[T: ClassTag](obj: T, id: Long)
   
   private def writeBlocks(value: T) {
     CrailStore.get.putValues(broadcastId, Iterator(value))
-    SparkEnv.get.blockManager.master.updateBlockInfo(SparkEnv.get.blockManager.blockManagerId, broadcastId, StorageLevel.OFF_HEAP, 32, 32)
   }
   
+//  private def readBroadcastBlock(): T = Utils.tryOrIOException {
+//    CrailBroadcast.synchronized {
+//      CrailStore.get.getValues(broadcastId).map(new BlockResult(_, DataReadMethod.Memory, 32)).map(_.data.next()) match {
+//        case Some(x) =>
+//          val obj = x.asInstanceOf[T]
+//          SparkEnv.get.blockManager.putSingle(
+//            broadcastId, obj, StorageLevel.MEMORY_ONLY, tellMaster = false)
+//          obj
+//        case None =>
+//          throw new SparkException(s"Failed to get broadcast " + broadcastId)
+//      }
+//    }
+//  }
+
   private def readBroadcastBlock(): T = Utils.tryOrIOException {
     CrailBroadcast.synchronized {
-      CrailStore.get.getValues(broadcastId).map(new BlockResult(_, DataReadMethod.Memory, 32)).map(_.data.next()) match {
-        case Some(x) =>
-          val obj = x.asInstanceOf[T]
-          SparkEnv.get.blockManager.putSingle(
-            broadcastId, obj, StorageLevel.MEMORY_ONLY, tellMaster = false)          
-          obj
-        case None =>
-          throw new SparkException(s"Failed to get broadcast " + broadcastId)
+      /* first lets find out if we have it locally cached */
+      SparkEnv.get.blockManager.getLocalValues(broadcastId).map(_.data.next())
+      match {
+        case Some(x) => x.asInstanceOf[T] /* we got it */
+        case None => /* we don't have it */
+          CrailStore.get.getValues(broadcastId).map(new BlockResult(_, DataReadMethod.Memory, 32)).map(_.data.next()) match {
+            case Some(x) => /* we read it and now put in the local store */
+              val obj = x.asInstanceOf[T]
+              SparkEnv.get.blockManager.putSingle(
+                broadcastId, obj, StorageLevel.MEMORY_ONLY, tellMaster = false)
+              obj
+            case None =>
+              throw new SparkException(s"Failed to get broadcast " + broadcastId)
+          }
       }
     }
   }

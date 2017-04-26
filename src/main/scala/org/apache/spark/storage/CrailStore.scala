@@ -240,6 +240,7 @@ class CrailStore () extends Logging {
             val instance = serializer.newInstance()
             val serializationStream = instance.serializeStream(stream)
             serializationStream.writeAll(values)
+            serializationStream.close();
             crailFile.update(fileInfo)
           }
         } catch {
