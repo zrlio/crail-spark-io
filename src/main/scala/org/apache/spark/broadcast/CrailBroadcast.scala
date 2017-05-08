@@ -23,10 +23,10 @@ package org.apache.spark.broadcast
 
 import java.io._
 
-import org.apache.spark.executor.DataReadMethod
 import org.apache.spark.storage._
 import org.apache.spark.{SparkEnv, SparkException}
 
+import scala.collection.mutable
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
@@ -44,42 +44,44 @@ private[spark] class CrailBroadcast[T: ClassTag](obj: T, id: Long)
     _value
   }
   
-  override protected def doUnpersist(blocking: Boolean) {
+  override protected def doUnpersist(blocking: Boolean): Unit = {
+    logWarning(" called doUnpersist on broadcastId: " + id + " (NYI)")
   }  
   
-  override protected def doDestroy(blocking: Boolean) {
+  override protected def doDestroy(blocking: Boolean): Unit = {
+    /* this is the chance where we can delete the broadcast file */
+    logWarning(" called doDestroy on broadcastId: " + id + " (NYI)")
   }
   
   private def writeBlocks(value: T) {
-    CrailStore.get.putValues(broadcastId, Iterator(value))
+    CrailStore.get.writeBroadcast(broadcastId, value)
   }
-  
-//  private def readBroadcastBlock(): T = Utils.tryOrIOException {
-//    CrailBroadcast.synchronized {
-//      CrailStore.get.getValues(broadcastId).map(new BlockResult(_, DataReadMethod.Memory, 32)).map(_.data.next()) match {
-//        case Some(x) =>
-//          val obj = x.asInstanceOf[T]
-//          SparkEnv.get.blockManager.putSingle(
-//            broadcastId, obj, StorageLevel.MEMORY_ONLY, tellMaster = false)
-//          obj
-//        case None =>
-//          throw new SparkException(s"Failed to get broadcast " + broadcastId)
-//      }
-//    }
-//  }
 
   private def readBroadcastBlock(): T = Utils.tryOrIOException {
     CrailBroadcast.synchronized {
       /* first lets find out if we have it locally cached */
-      SparkEnv.get.blockManager.getLocalValues(broadcastId).map(_.data.next())
-      match {
-        case Some(x) => x.asInstanceOf[T] /* we got it */
-        case None => /* we don't have it */
-          CrailStore.get.getValues(broadcastId).map(new BlockResult(_, DataReadMethod.Memory, 32)).map(_.data.next()) match {
+      val broadcast = if(CrailBroadcast.useLocalCache) {
+        CrailBroadcast.broadcastCache.getOrElse(id, None)
+      } else {
+        SparkEnv.get.blockManager.getLocalValues(broadcastId).map(_.data.next())
+      }
+      broadcast match {
+        /* we got it */
+        case Some(x) => x.asInstanceOf[T]
+        /* we don't have it */
+        case None =>
+          val start = System.nanoTime()
+          val bc = CrailStore.get.readBroadcast(id, broadcastId)
+          val end = System.nanoTime()
+          logInfo("Reading broadcast variable " + id + " took " + (end - start) / 1000 + " usec")
+          bc match {
             case Some(x) => /* we read it and now put in the local store */
               val obj = x.asInstanceOf[T]
-              SparkEnv.get.blockManager.putSingle(
-                broadcastId, obj, StorageLevel.MEMORY_ONLY, tellMaster = false)
+              if(CrailBroadcast.useLocalCache) {
+                CrailBroadcast.broadcastCache(id) = Some(x)
+              } else {
+                SparkEnv.get.blockManager.putSingle(broadcastId, obj, StorageLevel.MEMORY_ONLY, tellMaster = false)
+              }
               obj
             case None =>
               throw new SparkException(s"Failed to get broadcast " + broadcastId)
@@ -90,7 +92,27 @@ private[spark] class CrailBroadcast[T: ClassTag](obj: T, id: Long)
 }
 
 private object CrailBroadcast {
-  
+
+  //FIXME: (atr) I am not completely sure about if this gives us the best performance.
+  val broadcastCache:mutable.HashMap[Long, Option[Any]] = new mutable.HashMap[Long, Option[Any]]
+  private val useLocalCache = CrailStore.get.useBroadcastLocalCache
+
+  def unbroadcast(id: Long, removeFromDriver: Boolean, blocking: Boolean): Unit = {
+    this.synchronized {
+      if(useLocalCache) {
+        broadcastCache.remove(id)
+      } else {
+        SparkEnv.get.blockManager.master.removeBroadcast(id, removeFromDriver, blocking)
+        SparkEnv.get.blockManager.removeBroadcast(id, false)
+      }
+    }
+  }
+
+  def cleanCache(): Unit = {
+    this.synchronized {
+      broadcastCache.clear()
+    }
+  }
 }
 
 object Utils {

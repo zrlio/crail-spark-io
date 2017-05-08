@@ -33,6 +33,7 @@ import org.apache.spark.common._
 import org.apache.spark.executor.ShuffleWriteMetrics
 import org.apache.spark.shuffle.crail.{CrailSerializationStream, CrailSerializerInstance}
 
+import scala.reflect.ClassTag
 import scala.util.Random
 
 
@@ -69,6 +70,7 @@ class CrailStore () extends Logging {
   var shuffleCycle : Int = _
   var writeAhead : Long = _
   var debug : Boolean = _
+  var useBroadcastLocalCache:Boolean = _
   var hostHash : Int = 0
   var isMap : AtomicBoolean = new AtomicBoolean(true)
 
@@ -96,6 +98,7 @@ class CrailStore () extends Logging {
     shuffleCycle = conf.getInt("spark.crail.shuffleCycle", Int.MaxValue)
     writeAhead = conf.getLong("spark.crail.writeAhead", 0)
     debug = conf.getBoolean("spark.crail.debug", false)
+    useBroadcastLocalCache = conf.getBoolean("spark.crail.broadcast.useLocalCache", true)
 
     logInfo("spark.crail.shuffle.affinity " + mapLocationAffinity)
     logInfo("spark.crail.deleteonclose " + deleteOnClose)
@@ -105,6 +108,7 @@ class CrailStore () extends Logging {
     logInfo("spark.crail.shuffleCycle " + shuffleCycle)
     logInfo("spark.crail.writeAhead " + writeAhead)
     logInfo("spark.crail.debug " + debug)
+    logInfo(" spark.crail.broadcast.useLocalCache " + useBroadcastLocalCache)
 
     val crailConf = new CrailConfiguration();
     fs = CrailFS.newInstance(crailConf)
@@ -324,6 +328,101 @@ class CrailStore () extends Logging {
     }
     return ret
   }
+
+  /* broadcast serialization - we will gradually add more */
+  private object CrailBroadcastSerializer {
+    val byteArrayMark:Int = 1
+    val otherMark:Int = 2
+
+    def writeBroadcastOnce[T:ClassTag](value: T, outputStream: CrailBufferedOutputStream): Unit = {
+      value match {
+        case arr:Array[Byte] => {
+          /* write the mark */
+          outputStream.writeInt(byteArrayMark)
+          /* write the size */
+          outputStream.writeInt(arr.length)
+          /* write the data structure */
+          outputStream.write(arr)
+          /* purge and close */
+          outputStream.purge().get()
+          outputStream.close()
+        }
+        case o:Any => {
+          val defaultSparkSerializer = serializer.newInstance().serializeStream(outputStream)
+          /* write the mark */
+          outputStream.writeInt(otherMark)
+          /* write the value */
+          defaultSparkSerializer.writeObject(o)
+          /* purge (default spark only has the flush interface), and close */
+          defaultSparkSerializer.flush()
+          defaultSparkSerializer.close()
+        }
+      }
+    }
+
+    def readBroadcastOnce(inputStream: CrailBufferedInputStream): Option[Any] = {
+      inputStream.readInt() match {
+        case CrailBroadcastSerializer.byteArrayMark => {
+          /* get the size of the array */
+          val size = inputStream.readInt()
+          /* allocate the array and read it in */
+          val byteArray = new Array[Byte](size)
+          logInfo(" read a byte [] size : " + size)
+          inputStream.read(byteArray)
+          inputStream.close()
+          Some(byteArray)
+        }
+        case CrailBroadcastSerializer.otherMark => {
+          val defaultSparkDeserializer = serializer.newInstance().deserializeStream(inputStream)
+          val value = defaultSparkDeserializer.readObject[Any]()
+          logInfo(" read an object of tyep : " + value.getClass.getCanonicalName)
+          defaultSparkDeserializer.close()
+          Some(value)
+        }
+      }
+    }
+  }
+
+  def writeBroadcast[T: ClassTag](blockId: BlockId, value: T): Unit = {
+    val path = getPath(blockId)
+    try {
+      logDebug("Serialization broadcast " + blockId + " type : " + value.getClass.getCanonicalName)
+      val fileInfo = fs.create(path, CrailNodeType.DATAFILE, 0, 0).get().asFile()
+      val stream = fileInfo.getBufferedOutputStream(0)
+      CrailBroadcastSerializer.writeBroadcastOnce(value, stream)
+    } catch {
+      case e: Exception => e.printStackTrace()
+    }
+  }
+
+  private def readBroadcastDebug(id: Long, blockId: BlockId): Option[Any] = {
+    val path = getPath(blockId)
+    val s1 = System.nanoTime()
+    val fileInfo = fs.lookup(path).get().asFile()
+    val s2 = System.nanoTime()
+    val stream = fileInfo.getBufferedInputStream(fileInfo.getCapacity)
+    val s3 = System.nanoTime()
+    val value = CrailBroadcastSerializer.readBroadcastOnce(stream)
+    val s4 = System.nanoTime()
+    logInfo("Deserialization broadcast " + id + ": lookup " + ( s2 - s1)/ 1000 + " usec " +
+      " getBufferedStream " + (s3 - s2) / 1000 + " usec " +
+      " readObject2 " +  (s4 - s3) / 1000 + " usec " +
+      " end2end " + (s4 - s1) / 1000 + " usec , (size: " + fileInfo.getCapacity +
+      " bytes) , class type: " + value.get.getClass.getCanonicalName)
+    value
+  }
+
+  def readBroadcast(id: Long, blockId: BlockId): Option[Any] = {
+    if(!debug) {
+      val fileInfo = fs.lookup(getPath(blockId)).get().asFile()
+      val stream = fileInfo.getBufferedInputStream(fileInfo.getCapacity)
+      val value = CrailBroadcastSerializer.readBroadcastOnce(stream)
+      value
+    } else {
+      readBroadcastDebug(id, blockId)
+    }
+  }
+
 
   def isDebug() : Boolean = {
     return debug
