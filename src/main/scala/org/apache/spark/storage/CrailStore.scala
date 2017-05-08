@@ -152,7 +152,7 @@ class CrailStore () extends Logging {
       var file = fs.create(tmpFile, CrailNodeType.DATAFILE, 0, 0).get().asFile()
       file.syncDir()
       var fileStream = file.getDirectOutputStream(0)
-      val bufferQueue = new LinkedBlockingQueue[ByteBuffer]
+      val bufferQueue = new LinkedBlockingQueue[CrailBuffer]
       for( i <- 0 until preallocate){
         var buf = fs.allocateBuffer()
         bufferQueue.add(buf)
