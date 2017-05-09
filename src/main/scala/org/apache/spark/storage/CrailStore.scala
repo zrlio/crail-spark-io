@@ -70,7 +70,6 @@ class CrailStore () extends Logging {
   var shuffleCycle : Int = _
   var writeAhead : Long = _
   var debug : Boolean = _
-  var useBroadcastLocalCache:Boolean = _
   var hostHash : Int = 0
   var isMap : AtomicBoolean = new AtomicBoolean(true)
 
@@ -98,7 +97,6 @@ class CrailStore () extends Logging {
     shuffleCycle = conf.getInt("spark.crail.shuffleCycle", Int.MaxValue)
     writeAhead = conf.getLong("spark.crail.writeAhead", 0)
     debug = conf.getBoolean("spark.crail.debug", false)
-    useBroadcastLocalCache = conf.getBoolean("spark.crail.broadcast.useLocalCache", true)
 
     logInfo("spark.crail.shuffle.affinity " + mapLocationAffinity)
     logInfo("spark.crail.deleteonclose " + deleteOnClose)
@@ -108,7 +106,6 @@ class CrailStore () extends Logging {
     logInfo("spark.crail.shuffleCycle " + shuffleCycle)
     logInfo("spark.crail.writeAhead " + writeAhead)
     logInfo("spark.crail.debug " + debug)
-    logInfo(" spark.crail.broadcast.useLocalCache " + useBroadcastLocalCache)
 
     val crailConf = new CrailConfiguration();
     fs = CrailFS.newInstance(crailConf)
@@ -343,8 +340,7 @@ class CrailStore () extends Logging {
           outputStream.writeInt(arr.length)
           /* write the data structure */
           outputStream.write(arr)
-          /* purge and close */
-          outputStream.purge().get()
+          /* close will purge as well */
           outputStream.close()
         }
         case o:Any => {
@@ -361,13 +357,17 @@ class CrailStore () extends Logging {
     }
 
     def readBroadcastOnce(inputStream: CrailBufferedInputStream): Option[Any] = {
+      /* there is a tryCatch in CrailBroadcast class, it is fine. Also since we
+      serialized it, and there is suppose to be only one object - it is safe
+      to read it without having to worry about EOF. If the file is zero bytes
+      then that is an error anyways, and will be caught at the top level code.
+       */
       inputStream.readInt() match {
         case CrailBroadcastSerializer.byteArrayMark => {
           /* get the size of the array */
           val size = inputStream.readInt()
           /* allocate the array and read it in */
           val byteArray = new Array[Byte](size)
-          logInfo(" read a byte [] size : " + size)
           inputStream.read(byteArray)
           inputStream.close()
           Some(byteArray)
@@ -375,7 +375,6 @@ class CrailStore () extends Logging {
         case CrailBroadcastSerializer.otherMark => {
           val defaultSparkDeserializer = serializer.newInstance().deserializeStream(inputStream)
           val value = defaultSparkDeserializer.readObject[Any]()
-          logInfo(" read an object of tyep : " + value.getClass.getCanonicalName)
           defaultSparkDeserializer.close()
           Some(value)
         }
@@ -386,7 +385,6 @@ class CrailStore () extends Logging {
   def writeBroadcast[T: ClassTag](blockId: BlockId, value: T): Unit = {
     val path = getPath(blockId)
     try {
-      logDebug("Serialization broadcast " + blockId + " type : " + value.getClass.getCanonicalName)
       val fileInfo = fs.create(path, CrailNodeType.DATAFILE, 0, 0).get().asFile()
       val stream = fileInfo.getBufferedOutputStream(0)
       CrailBroadcastSerializer.writeBroadcastOnce(value, stream)
