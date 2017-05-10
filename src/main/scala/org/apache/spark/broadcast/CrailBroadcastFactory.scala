@@ -34,9 +34,12 @@ class CrailBroadcastFactory extends BroadcastFactory {
     new CrailBroadcast[T](value_, id)
   }
 
-  override def stop() { }
+  override def stop(): Unit = {
+    CrailBroadcast.cleanCache()
+  }
 
-  override def unbroadcast(id: Long, removeFromDriver: Boolean, blocking: Boolean) {
+  override def unbroadcast(id: Long, removeFromDriver: Boolean, blocking: Boolean): Unit = {
+    CrailBroadcast.unbroadcast(id, removeFromDriver, blocking)
   }
 }
 

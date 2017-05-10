@@ -33,6 +33,7 @@ import org.apache.spark.common._
 import org.apache.spark.executor.ShuffleWriteMetrics
 import org.apache.spark.shuffle.crail.{CrailSerializationStream, CrailSerializerInstance}
 
+import scala.reflect.ClassTag
 import scala.util.Random
 
 
@@ -324,6 +325,102 @@ class CrailStore () extends Logging {
     }
     return ret
   }
+
+  /* broadcast serialization - we will gradually add more */
+  private object CrailBroadcastSerializer {
+    val byteArrayMark:Int = 1
+    val otherMark:Int = 2
+
+    def writeBroadcastOnce[T:ClassTag](value: T, outputStream: CrailBufferedOutputStream): Unit = {
+      value match {
+        case arr:Array[Byte] => {
+          /* write the mark */
+          outputStream.writeInt(byteArrayMark)
+          /* write the size */
+          outputStream.writeInt(arr.length)
+          /* write the data structure */
+          outputStream.write(arr)
+          /* close will purge as well */
+          outputStream.close()
+        }
+        case o:Any => {
+          val defaultSparkSerializer = serializer.newInstance().serializeStream(outputStream)
+          /* write the mark */
+          outputStream.writeInt(otherMark)
+          /* write the value */
+          defaultSparkSerializer.writeObject(o)
+          /* purge (default spark only has the flush interface), and close */
+          defaultSparkSerializer.flush()
+          defaultSparkSerializer.close()
+        }
+      }
+    }
+
+    def readBroadcastOnce(inputStream: CrailBufferedInputStream): Option[Any] = {
+      /* there is a tryCatch in CrailBroadcast class, it is fine. Also since we
+      serialized it, and there is suppose to be only one object - it is safe
+      to read it without having to worry about EOF. If the file is zero bytes
+      then that is an error anyways, and will be caught at the top level code.
+       */
+      inputStream.readInt() match {
+        case CrailBroadcastSerializer.byteArrayMark => {
+          /* get the size of the array */
+          val size = inputStream.readInt()
+          /* allocate the array and read it in */
+          val byteArray = new Array[Byte](size)
+          inputStream.read(byteArray)
+          inputStream.close()
+          Some(byteArray)
+        }
+        case CrailBroadcastSerializer.otherMark => {
+          val defaultSparkDeserializer = serializer.newInstance().deserializeStream(inputStream)
+          val value = defaultSparkDeserializer.readObject[Any]()
+          defaultSparkDeserializer.close()
+          Some(value)
+        }
+      }
+    }
+  }
+
+  def writeBroadcast[T: ClassTag](blockId: BlockId, value: T): Unit = {
+    val path = getPath(blockId)
+    try {
+      val fileInfo = fs.create(path, CrailNodeType.DATAFILE, 0, 0).get().asFile()
+      val stream = fileInfo.getBufferedOutputStream(0)
+      CrailBroadcastSerializer.writeBroadcastOnce(value, stream)
+    } catch {
+      case e: Exception => e.printStackTrace()
+    }
+  }
+
+  private def readBroadcastDebug(id: Long, blockId: BlockId): Option[Any] = {
+    val path = getPath(blockId)
+    val s1 = System.nanoTime()
+    val fileInfo = fs.lookup(path).get().asFile()
+    val s2 = System.nanoTime()
+    val stream = fileInfo.getBufferedInputStream(fileInfo.getCapacity)
+    val s3 = System.nanoTime()
+    val value = CrailBroadcastSerializer.readBroadcastOnce(stream)
+    val s4 = System.nanoTime()
+    logInfo("Deserialization broadcast " + id + ": lookup " + ( s2 - s1)/ 1000 + " usec " +
+      " getBufferedStream " + (s3 - s2) / 1000 + " usec " +
+      " readObject2 " +  (s4 - s3) / 1000 + " usec " +
+      " end2end " + (s4 - s1) / 1000 + " usec , (size: " + fileInfo.getCapacity +
+      " bytes) , class type: " + value.get.getClass.getCanonicalName)
+    value
+  }
+
+  def readBroadcast(id: Long, blockId: BlockId): Option[Any] = {
+    if(!debug) {
+      val fileInfo = fs.lookup(getPath(blockId)).get().asFile()
+      val stream = fileInfo.getBufferedInputStream(fileInfo.getCapacity)
+      val value = CrailBroadcastSerializer.readBroadcastOnce(stream)
+      value
+    } else {
+      readBroadcastDebug(id, blockId)
+    }
+  }
+
 
   def isDebug() : Boolean = {
     return debug
