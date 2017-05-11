@@ -24,8 +24,8 @@ package org.apache.spark.serializer
 import java.nio.ByteBuffer
 
 import com.ibm.crail.{CrailBufferedInputStream, CrailBufferedOutputStream}
-import org.apache.spark.ShuffleDependency
 import org.apache.spark.annotation.DeveloperApi
+import scala.reflect.ClassTag
 
 /**
  * Created by stu on 08.09.16.
@@ -42,10 +42,12 @@ trait CrailSerializerInstance {
 
 @DeveloperApi
 abstract class CrailSerializationStream extends SerializationStream {
+//  def writeBroadcast[T: ClassTag](value: T) : Unit
 }
 
 @DeveloperApi
 abstract class CrailDeserializationStream extends DeserializationStream {
+//  def readBroadcast(): Any
   def read(buf: ByteBuffer) : Int
   def available() : Int
 }

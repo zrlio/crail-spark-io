@@ -54,24 +54,25 @@ class CrailSparkSerializationStream(defaultSerializer: Serializer, crailStream: 
 
   lazy val serializerStream = defaultSerializer.newInstance().serializeStream(crailStream)
 
+//  final def writeBroadcast[T: ClassTag](value: T): Unit = {
+//    value match {
+//      case arr: Array[Byte] => {
+//        /* write the mark */
+//        crailStream.writeInt(CrailSparkSerializerInstance.byteArrayMark)
+//        /* write the size */
+//        crailStream.writeInt(arr.length)
+//        /* write the data structure */
+//        crailStream.write(arr)
+//      }
+//      case o: Any => {
+//        crailStream.writeInt(CrailSparkSerializerInstance.otherMark)
+//        serializerStream.writeObject(value)
+//      }
+//    }
+//  }
+
   override final def writeObject[T: ClassTag](value: T): SerializationStream = {
-    value match {
-      case arr: Array[Byte] => {
-        /* write the mark */
-        crailStream.writeInt(CrailSparkSerializerInstance.byteArrayMark)
-        /* write the size */
-        crailStream.writeInt(arr.length)
-        /* write the data structure */
-        crailStream.write(arr)
-        /* close will purge as well */
-        crailStream.close()
-      }
-      case o: Any => {
-        crailStream.writeInt(CrailSparkSerializerInstance.otherMark)
-        serializerStream.writeObject(value)
-      }
-    }
-    this
+    serializerStream.writeObject(value)
   }
 
   override final def flush(): Unit = {
@@ -103,24 +104,24 @@ class CrailSparkDeserializationStream(defaultSerializer: Serializer, crailStream
 
   lazy val deserializerStream = defaultSerializer.newInstance().deserializeStream(crailStream)
 
+//  final def readBroadcast(): Any = {
+//    crailStream.readInt() match {
+//      case CrailSparkSerializerInstance.byteArrayMark => {
+//        /* get the size of the array */
+//        val size = crailStream.readInt()
+//        /* allocate the array and read it in */
+//        val byteArray = new Array[Byte](size)
+//        crailStream.read(byteArray)
+//        crailStream.close()
+//        byteArray
+//      }
+//      case CrailSparkSerializerInstance.otherMark => {
+//        deserializerStream.readObject()
+//      }
+//    }
+//  }
+
   override final def readObject[T: ClassTag](): T = {
-    crailStream.readInt() match {
-      case CrailSparkSerializerInstance.byteArrayMark => {
-        /* get the size of the array */
-        val size = crailStream.readInt()
-        /* allocate the array and read it in */
-        val byteArray = new Array[Byte](size)
-        crailStream.read(byteArray)
-        crailStream.close()
-        Some(byteArray)
-      }
-      case CrailSparkSerializerInstance.otherMark => {
-        deserializerStream.readObject()
-      }
-    }
-
-
-
     deserializerStream.readObject()
   }
 

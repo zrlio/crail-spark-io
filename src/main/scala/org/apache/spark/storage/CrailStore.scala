@@ -79,7 +79,7 @@ class CrailStore () extends Logging {
   var fileCache : ConcurrentHashMap[String, CrailBlockFile] = _
   var shuffleCache: ConcurrentHashMap[Integer, CrailShuffleStore] = _
   var crailSerializer : CrailSerializer = _
-  var defaultSerializerInstance : CrailSerializerInstance = _
+//  var defaultSerializerInstance : CrailSerializerInstance = _
 
   var fileGroupOpenStats = new AtomicLong(0)
   var streamGroupOpenStats = new AtomicLong(0)
@@ -91,7 +91,7 @@ class CrailStore () extends Logging {
 
 
   private def init(): Unit = {
-    logInfo("CrailStore starting version 295")
+    logInfo("CrailStore starting version 296")
 
     mapLocationAffinity = conf.getBoolean("spark.crail.shuffle.map.locationaffinity", true)
     deleteOnClose = conf.getBoolean("spark.crail.deleteonclose", false)
@@ -118,7 +118,7 @@ class CrailStore () extends Logging {
     fileCache = new ConcurrentHashMap[String, CrailBlockFile]()
     shuffleCache = new ConcurrentHashMap[Integer, CrailShuffleStore]()
     crailSerializer = Utils.classForName(crailSerializerClass).newInstance.asInstanceOf[CrailSerializer]
-    defaultSerializerInstance = crailSerializer.newCrailSerializer(serializer)
+//    defaultSerializerInstance = crailSerializer.newCrailSerializer(serializer)
 
     if (mapLocationAffinity){
       hostHash = fs.getHostHash
@@ -343,7 +343,7 @@ class CrailStore () extends Logging {
     try {
       val fileInfo = fs.create(path, CrailNodeType.DATAFILE, 0, 0).get().asFile()
       val stream = fileInfo.getBufferedOutputStream(0)
-      val serializationStream = defaultSerializerInstance.serializeCrailStream(stream)
+      val serializationStream = crailSerializer.newCrailSerializer(serializer).serializeCrailStream(stream)
       serializationStream.writeObject(value)
       serializationStream.close()
     } catch {
@@ -358,7 +358,7 @@ class CrailStore () extends Logging {
     val s2 = System.nanoTime()
     val stream = fileInfo.getBufferedInputStream(fileInfo.getCapacity)
     val s3 = System.nanoTime()
-    val deserializationStream = defaultSerializerInstance.deserializeCrailStream(stream)
+    val deserializationStream = crailSerializer.newCrailSerializer(serializer).deserializeCrailStream(stream)
     val value = Some(deserializationStream.readObject())
     val s4 = System.nanoTime()
     logInfo("Deserialization broadcast " + id + ": lookup " + ( s2 - s1)/ 1000 + " usec " +
