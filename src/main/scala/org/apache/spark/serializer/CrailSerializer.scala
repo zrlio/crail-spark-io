@@ -19,26 +19,25 @@
  *
  */
 
-package org.apache.spark.shuffle.crail
+package org.apache.spark.serializer
 
 import java.nio.ByteBuffer
 
-import com.ibm.crail.{CrailBufferedOutputStream, CrailMultiStream}
+import com.ibm.crail.{CrailBufferedInputStream, CrailBufferedOutputStream}
 import org.apache.spark.ShuffleDependency
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.serializer._
 
 /**
  * Created by stu on 08.09.16.
  */
-trait CrailShuffleSerializer {
-  def newCrailSerializer[K, V](dep: ShuffleDependency[K,_,V]): CrailSerializerInstance
+trait CrailSerializer {
+  def newCrailSerializer(defaultSerializer: Serializer): CrailSerializerInstance
 }
 
 trait CrailSerializerInstance {
   def serializeCrailStream(s: CrailBufferedOutputStream): CrailSerializationStream
 
-  def deserializeCrailStream(s: CrailMultiStream): CrailDeserializationStream
+  def deserializeCrailStream(s: CrailBufferedInputStream): CrailDeserializationStream
 }
 
 @DeveloperApi

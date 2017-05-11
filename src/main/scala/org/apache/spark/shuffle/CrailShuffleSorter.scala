@@ -19,10 +19,10 @@
  *
  */
 
-package org.apache.spark.shuffle.crail
+package org.apache.spark.shuffle
 
 import org.apache.spark.TaskContext
-import org.apache.spark.serializer.Serializer
+import org.apache.spark.serializer.{CrailDeserializationStream, Serializer}
 
 /**
  * Created by stu on 22.08.16.

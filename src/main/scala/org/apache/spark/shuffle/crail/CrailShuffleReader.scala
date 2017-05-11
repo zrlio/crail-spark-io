@@ -23,8 +23,8 @@ package org.apache.spark.shuffle.crail
 
 import org.apache.spark._
 import org.apache.spark.common._
-import org.apache.spark.serializer.SerializerManager
-import org.apache.spark.shuffle.{BaseShuffleHandle, ShuffleReader}
+import org.apache.spark.serializer.{CrailSerializer, SerializerManager}
+import org.apache.spark.shuffle.{CrailShuffleSorter, BaseShuffleHandle, ShuffleReader}
 import org.apache.spark.storage._
 
 
@@ -33,7 +33,6 @@ class CrailShuffleReader[K, C](
     startPartition: Int,
     endPartition: Int,
     context: TaskContext,
-    crailSerializer: CrailShuffleSerializer,
     crailSorter: CrailShuffleSorter,
     serializerManager: SerializerManager = SparkEnv.get.serializerManager,
     blockManager: BlockManager = SparkEnv.get.blockManager,
@@ -43,7 +42,7 @@ class CrailShuffleReader[K, C](
   require(endPartition == startPartition + 1, "Crail shuffle currently only supports fetching one partition")
 
   private val dep = handle.dependency
-  private val serializerInstance = crailSerializer.newCrailSerializer(dep)
+  private val serializerInstance = CrailStore.get.getCrailSerializer().newCrailSerializer(dep.serializer)
 
   /** Read the combined key-values for this reduce task */
   override def read(): Iterator[Product2[K, C]] = {

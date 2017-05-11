@@ -19,11 +19,11 @@
  *
  */
 
-package org.apache.spark.shuffle.crail
+package org.apache.spark.shuffle
 
 import org.apache.spark.TaskContext
 import org.apache.spark.common.Logging
-import org.apache.spark.serializer.Serializer
+import org.apache.spark.serializer.{CrailDeserializationStream, Serializer}
 import org.apache.spark.util.CompletionIterator
 import org.apache.spark.util.collection.ExternalSorter
 

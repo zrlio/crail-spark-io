@@ -21,7 +21,7 @@
 
 package org.apache.spark.shuffle.crail
 
-import com.ibm.crail.CrailMultiStream
+import org.apache.spark.serializer.CrailDeserializationStream
 
 /**
  * Created by stu on 24.09.16.

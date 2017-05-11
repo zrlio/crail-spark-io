@@ -24,6 +24,7 @@ package org.apache.spark.shuffle.crail
 import org.apache.spark._
 import org.apache.spark.common._
 import org.apache.spark.scheduler.MapStatus
+import org.apache.spark.serializer.CrailSerializer
 import org.apache.spark.shuffle._
 import org.apache.spark.storage._
 
@@ -32,15 +33,14 @@ class CrailShuffleWriter[K, V](
     shuffleBlockManager: CrailShuffleBlockResolver,
     handle: BaseShuffleHandle[K, V, _],
     mapId: Int,
-    context: TaskContext,
-    crailSerializer: CrailShuffleSerializer)
+    context: TaskContext)
   extends ShuffleWriter[K, V] with Logging {
 
   private val dep = handle.dependency
   private val blockManager = SparkEnv.get.blockManager
   private var stopping = false
   private val writeMetrics = context.taskMetrics().shuffleWriteMetrics
-  var serializerInstance = crailSerializer.newCrailSerializer(dep)
+  var serializerInstance =  CrailStore.get.getCrailSerializer().newCrailSerializer(dep.serializer)
   var startTime : Double = System.nanoTime() / 1000
   private val shuffle : CrailShuffleWriterGroup = CrailStore.get.getWriterGroup(dep.shuffleId, dep.partitioner.numPartitions, serializerInstance, writeMetrics)
   var initTime : Double = (System.nanoTime()/1000) - startTime

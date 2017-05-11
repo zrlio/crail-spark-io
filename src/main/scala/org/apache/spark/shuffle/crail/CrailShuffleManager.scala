@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import org.apache.spark._
 import org.apache.spark.common._
 import org.apache.spark.network.buffer.ManagedBuffer
+import org.apache.spark.serializer.CrailSerializer
 import org.apache.spark.shuffle._
 import org.apache.spark.storage.{CrailStore, ShuffleBlockId}
 import org.apache.spark.util.Utils
@@ -39,13 +40,9 @@ private[spark] class CrailShuffleManager(conf: SparkConf) extends ShuffleManager
   private var intialized = new AtomicBoolean(false)
 
   lazy val shuffleSorterClass =
-    conf.get("spark.crail.shuffle.sorter", "org.apache.spark.shuffle.crail.CrailSparkShuffleSorter")
-  lazy val shuffleSerializerClass =
-    conf.get("spark.crail.shuffle.serializer", "org.apache.spark.shuffle.crail.CrailSparkShuffleSerializer")
+    conf.get("spark.crail.shuffle.sorter", "org.apache.spark.shuffle.CrailSparkShuffleSorter")
   lazy val shuffleSorter =
     Utils.classForName(shuffleSorterClass).newInstance.asInstanceOf[CrailShuffleSorter]
-  lazy val shuffleSerializer =
-    Utils.classForName(shuffleSerializerClass).newInstance.asInstanceOf[CrailShuffleSerializer]
 
   /* Register a shuffle with the manager and obtain a handle for it to pass to tasks. */
   override def registerShuffle[K, V, C](
@@ -66,18 +63,17 @@ private[spark] class CrailShuffleManager(conf: SparkConf) extends ShuffleManager
       endPartition: Int,
       context: TaskContext): ShuffleReader[K, C] = {
     if (intialized.compareAndSet(false, true)){
-      logInfo("loading shuffler serializer " + shuffleSerializerClass)
       logInfo("loading shuffler sorter " + shuffleSorterClass)
     }
     new CrailShuffleReader(handle.asInstanceOf[BaseShuffleHandle[K, _, C]],
-      startPartition, endPartition, context, shuffleSerializer, shuffleSorter)
+      startPartition, endPartition, context, shuffleSorter)
   }  
   
   /** Get a writer for a given partition. Called on executors by map tasks. */
   override def getWriter[K, V](handle: ShuffleHandle, mapId: Int, context: TaskContext)
       : ShuffleWriter[K, V] = {
     new CrailShuffleWriter(shuffleBlockResolver, handle.asInstanceOf[BaseShuffleHandle[K, V, _]],
-      mapId, context, shuffleSerializer)
+      mapId, context)
   }
   
   /** Remove a shuffle's metadata from the ShuffleManager. */

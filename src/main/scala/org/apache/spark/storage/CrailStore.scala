@@ -31,8 +31,9 @@ import com.ibm.crail.utils.CrailImmediateOperation
 import org.apache.spark._
 import org.apache.spark.common._
 import org.apache.spark.executor.ShuffleWriteMetrics
-import org.apache.spark.shuffle.crail.{CrailSerializationStream, CrailSerializerInstance}
-
+import org.apache.spark.serializer.{CrailSerializer, CrailSerializationStream, CrailSerializerInstance}
+import org.apache.spark.shuffle.CrailShuffleSorter
+import org.apache.spark.util.Utils
 import scala.reflect.ClassTag
 import scala.util.Random
 
@@ -72,10 +73,13 @@ class CrailStore () extends Logging {
   var debug : Boolean = _
   var hostHash : Int = 0
   var isMap : AtomicBoolean = new AtomicBoolean(true)
+  var crailSerializerClass : String = _
 
   var fs : CrailFS = _
   var fileCache : ConcurrentHashMap[String, CrailBlockFile] = _
   var shuffleCache: ConcurrentHashMap[Integer, CrailShuffleStore] = _
+  var crailSerializer : CrailSerializer = _
+  var defaultSerializerInstance : CrailSerializerInstance = _
 
   var fileGroupOpenStats = new AtomicLong(0)
   var streamGroupOpenStats = new AtomicLong(0)
@@ -87,7 +91,7 @@ class CrailStore () extends Logging {
 
 
   private def init(): Unit = {
-    logInfo("CrailStore starting version 282")
+    logInfo("CrailStore starting version 294")
 
     mapLocationAffinity = conf.getBoolean("spark.crail.shuffle.map.locationaffinity", true)
     deleteOnClose = conf.getBoolean("spark.crail.deleteonclose", false)
@@ -97,6 +101,7 @@ class CrailStore () extends Logging {
     shuffleCycle = conf.getInt("spark.crail.shuffleCycle", Int.MaxValue)
     writeAhead = conf.getLong("spark.crail.writeAhead", 0)
     debug = conf.getBoolean("spark.crail.debug", false)
+    crailSerializerClass = conf.get("spark.crail.serializer", "org.apache.spark.serializer.CrailSparkSerializer")
 
     logInfo("spark.crail.shuffle.affinity " + mapLocationAffinity)
     logInfo("spark.crail.deleteonclose " + deleteOnClose)
@@ -106,11 +111,14 @@ class CrailStore () extends Logging {
     logInfo("spark.crail.shuffleCycle " + shuffleCycle)
     logInfo("spark.crail.writeAhead " + writeAhead)
     logInfo("spark.crail.debug " + debug)
+    logInfo("spark.crail.serializer " + crailSerializerClass)
 
     val crailConf = new CrailConfiguration();
     fs = CrailFS.newInstance(crailConf)
     fileCache = new ConcurrentHashMap[String, CrailBlockFile]()
     shuffleCache = new ConcurrentHashMap[Integer, CrailShuffleStore]()
+    crailSerializer = Utils.classForName(crailSerializerClass).newInstance.asInstanceOf[CrailSerializer]
+    defaultSerializerInstance = crailSerializer.newCrailSerializer(serializer)
 
     if (mapLocationAffinity){
       hostHash = fs.getHostHash
@@ -176,6 +184,10 @@ class CrailStore () extends Logging {
 
     fs.getStatistics.print("init")
     fs.getStatistics.reset()
+  }
+
+  def getCrailSerializer(): CrailSerializer = {
+    return crailSerializer
   }
 
   def removeBlock(blockId: BlockId): Boolean = {
@@ -326,68 +338,14 @@ class CrailStore () extends Logging {
     return ret
   }
 
-  /* broadcast serialization - we will gradually add more */
-  private object CrailBroadcastSerializer {
-    val byteArrayMark:Int = 1
-    val otherMark:Int = 2
-
-    def writeBroadcastOnce[T:ClassTag](value: T, outputStream: CrailBufferedOutputStream): Unit = {
-      value match {
-        case arr:Array[Byte] => {
-          /* write the mark */
-          outputStream.writeInt(byteArrayMark)
-          /* write the size */
-          outputStream.writeInt(arr.length)
-          /* write the data structure */
-          outputStream.write(arr)
-          /* close will purge as well */
-          outputStream.close()
-        }
-        case o:Any => {
-          val defaultSparkSerializer = serializer.newInstance().serializeStream(outputStream)
-          /* write the mark */
-          outputStream.writeInt(otherMark)
-          /* write the value */
-          defaultSparkSerializer.writeObject(o)
-          /* purge (default spark only has the flush interface), and close */
-          defaultSparkSerializer.flush()
-          defaultSparkSerializer.close()
-        }
-      }
-    }
-
-    def readBroadcastOnce(inputStream: CrailBufferedInputStream): Option[Any] = {
-      /* there is a tryCatch in CrailBroadcast class, it is fine. Also since we
-      serialized it, and there is suppose to be only one object - it is safe
-      to read it without having to worry about EOF. If the file is zero bytes
-      then that is an error anyways, and will be caught at the top level code.
-       */
-      inputStream.readInt() match {
-        case CrailBroadcastSerializer.byteArrayMark => {
-          /* get the size of the array */
-          val size = inputStream.readInt()
-          /* allocate the array and read it in */
-          val byteArray = new Array[Byte](size)
-          inputStream.read(byteArray)
-          inputStream.close()
-          Some(byteArray)
-        }
-        case CrailBroadcastSerializer.otherMark => {
-          val defaultSparkDeserializer = serializer.newInstance().deserializeStream(inputStream)
-          val value = defaultSparkDeserializer.readObject[Any]()
-          defaultSparkDeserializer.close()
-          Some(value)
-        }
-      }
-    }
-  }
-
   def writeBroadcast[T: ClassTag](blockId: BlockId, value: T): Unit = {
     val path = getPath(blockId)
     try {
       val fileInfo = fs.create(path, CrailNodeType.DATAFILE, 0, 0).get().asFile()
       val stream = fileInfo.getBufferedOutputStream(0)
-      CrailBroadcastSerializer.writeBroadcastOnce(value, stream)
+      val serializationStream = defaultSerializerInstance.serializeCrailStream(stream)
+      serializationStream.writeObject(value)
+      serializationStream.close()
     } catch {
       case e: Exception => e.printStackTrace()
     }
@@ -400,7 +358,8 @@ class CrailStore () extends Logging {
     val s2 = System.nanoTime()
     val stream = fileInfo.getBufferedInputStream(fileInfo.getCapacity)
     val s3 = System.nanoTime()
-    val value = CrailBroadcastSerializer.readBroadcastOnce(stream)
+    val deserializationStream = defaultSerializerInstance.deserializeCrailStream(stream)
+    val value = Some(deserializationStream.readObject())
     val s4 = System.nanoTime()
     logInfo("Deserialization broadcast " + id + ": lookup " + ( s2 - s1)/ 1000 + " usec " +
       " getBufferedStream " + (s3 - s2) / 1000 + " usec " +
@@ -414,7 +373,8 @@ class CrailStore () extends Logging {
     if(!debug) {
       val fileInfo = fs.lookup(getPath(blockId)).get().asFile()
       val stream = fileInfo.getBufferedInputStream(fileInfo.getCapacity)
-      val value = CrailBroadcastSerializer.readBroadcastOnce(stream)
+      val deserializationStream = crailSerializer.newCrailSerializer(serializer).deserializeCrailStream(stream)
+      val value = Some(deserializationStream.readObject())
       value
     } else {
       readBroadcastDebug(id, blockId)
@@ -544,7 +504,7 @@ class CrailStore () extends Logging {
     streamGroupCloseStats.incrementAndGet()
   }
 
-  def getMultiStream(shuffleId: Int, reduceId: Int, numMaps:Int) : CrailMultiStream = {
+  def getMultiStream(shuffleId: Int, reduceId: Int, numMaps:Int) : CrailBufferedInputStream = {
     if (debug){
       //request by map task, if first (still in reduce state) then print reduce stats
       isMap.synchronized(
