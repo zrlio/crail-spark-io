@@ -42,12 +42,12 @@ trait CrailSerializerInstance {
 
 @DeveloperApi
 abstract class CrailSerializationStream extends SerializationStream {
-//  def writeBroadcast[T: ClassTag](value: T) : Unit
+  def writeBroadcast[T: ClassTag](value: T): Unit
 }
 
 @DeveloperApi
 abstract class CrailDeserializationStream extends DeserializationStream {
-//  def readBroadcast(): Any
+  def readBroadcast(): Any
   def read(buf: ByteBuffer) : Int
   def available() : Int
 }

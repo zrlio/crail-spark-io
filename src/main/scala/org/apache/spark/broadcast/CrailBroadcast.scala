@@ -70,10 +70,7 @@ private[spark] class CrailBroadcast[T: ClassTag](obj: T, id: Long)
         case Some(x) => x.asInstanceOf[T]
         /* we don't have it */
         case None =>
-          val start = System.nanoTime()
           val bc = CrailStore.get.readBroadcast(id, broadcastId)
-          val end = System.nanoTime()
-          logInfo("Reading broadcast variable " + id + " took " + (end - start) / 1000 + " usec")
           bc match {
             case Some(x) => /* we read it and now put in the local store */
               val obj = x.asInstanceOf[T]

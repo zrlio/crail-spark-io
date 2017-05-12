@@ -91,7 +91,7 @@ class CrailStore () extends Logging {
 
 
   private def init(): Unit = {
-    logInfo("CrailStore starting version 296")
+    logInfo("CrailStore starting version 299")
 
     mapLocationAffinity = conf.getBoolean("spark.crail.shuffle.map.locationaffinity", true)
     deleteOnClose = conf.getBoolean("spark.crail.deleteonclose", false)
@@ -344,7 +344,7 @@ class CrailStore () extends Logging {
       val fileInfo = fs.create(path, CrailNodeType.DATAFILE, 0, 0).get().asFile()
       val stream = fileInfo.getBufferedOutputStream(0)
       val serializationStream = crailSerializer.newCrailSerializer(serializer).serializeCrailStream(stream)
-      serializationStream.writeObject(value)
+      serializationStream.writeBroadcast(value)
       serializationStream.close()
     } catch {
       case e: Exception => e.printStackTrace()
@@ -359,7 +359,8 @@ class CrailStore () extends Logging {
     val stream = fileInfo.getBufferedInputStream(fileInfo.getCapacity)
     val s3 = System.nanoTime()
     val deserializationStream = crailSerializer.newCrailSerializer(serializer).deserializeCrailStream(stream)
-    val value = Some(deserializationStream.readObject())
+    val value = Some(deserializationStream.readBroadcast())
+    deserializationStream.close()
     val s4 = System.nanoTime()
     logInfo("Deserialization broadcast " + id + ": lookup " + ( s2 - s1)/ 1000 + " usec " +
       " getBufferedStream " + (s3 - s2) / 1000 + " usec " +
@@ -374,7 +375,8 @@ class CrailStore () extends Logging {
       val fileInfo = fs.lookup(getPath(blockId)).get().asFile()
       val stream = fileInfo.getBufferedInputStream(fileInfo.getCapacity)
       val deserializationStream = crailSerializer.newCrailSerializer(serializer).deserializeCrailStream(stream)
-      val value = Some(deserializationStream.readObject())
+      val value = Some(deserializationStream.readBroadcast())
+      deserializationStream.close()
       value
     } else {
       readBroadcastDebug(id, blockId)
