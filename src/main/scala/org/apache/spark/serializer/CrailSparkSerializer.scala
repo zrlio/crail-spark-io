@@ -57,7 +57,7 @@ class CrailSparkSerializationStream(defaultSerializer: Serializer, crailStream: 
 //  lazy val serializerStream = defaultSerializer.newInstance().serializeStream(crailStream)
   var serializerStream : SerializationStream = null
 
-  final def writeBroadcast[T: ClassTag](value: T): Unit = {
+  def writeBroadcast[T: ClassTag](value: T): Unit = {
     value match {
       case arr: Array[Byte] => {
         /* write the mark */
@@ -75,23 +75,23 @@ class CrailSparkSerializationStream(defaultSerializer: Serializer, crailStream: 
     }
   }
 
-  override final def writeObject[T: ClassTag](value: T): SerializationStream = {
+  override def writeObject[T: ClassTag](value: T): SerializationStream = {
     getDefaultSerializationStream().writeObject(value)
   }
 
-  override final def flush(): Unit = {
+  override def flush(): Unit = {
     getDefaultSerializationStream().flush()
   }
 
-  override final def writeKey[T: ClassTag](key: T): SerializationStream = {
+  override def writeKey[T: ClassTag](key: T): SerializationStream = {
     getDefaultSerializationStream().writeKey(key)
   }
   /** Writes the object representing the value of a key-value pair. */
-  override final def writeValue[T: ClassTag](value: T): SerializationStream = {
+  override def writeValue[T: ClassTag](value: T): SerializationStream = {
     getDefaultSerializationStream().writeValue(value)
   }
 
-  override final def close(): Unit = {
+  override def close(): Unit = {
     if (serializerStream != null){
       serializerStream.flush()
       serializerStream.close()
@@ -100,7 +100,7 @@ class CrailSparkSerializationStream(defaultSerializer: Serializer, crailStream: 
     }
   }
 
-  override final def writeAll[T: ClassTag](iter: Iterator[T]): SerializationStream = {
+  override def writeAll[T: ClassTag](iter: Iterator[T]): SerializationStream = {
     getDefaultSerializationStream().writeAll(iter)
   }
 
@@ -121,7 +121,7 @@ class CrailSparkDeserializationStream(defaultSerializer: Serializer, crailStream
 //  lazy val deserializerStream = defaultSerializer.newInstance().deserializeStream(crailStream)
   var deserializerStream : DeserializationStream = null
 
-  final def readBroadcast(): Any = {
+  def readBroadcast(): Any = {
     crailStream.readInt() match {
       case CrailSparkSerializerInstance.byteArrayMark => {
         /* get the size of the array */
@@ -137,20 +137,20 @@ class CrailSparkDeserializationStream(defaultSerializer: Serializer, crailStream
     }
   }
 
-  override final def readObject[T: ClassTag](): T = {
+  override def readObject[T: ClassTag](): T = {
     getDefaultSerializationStream().readObject()
   }
 
   /* for key we return the address */
-  override final def readKey[T: ClassTag](): T = {
+  override def readKey[T: ClassTag](): T = {
     getDefaultSerializationStream().readKey()
   }
 
-  override final def readValue[T: ClassTag](): T = {
+  override def readValue[T: ClassTag](): T = {
     getDefaultSerializationStream().readValue()
   }
 
-  override final def close(): Unit = {
+  override def close(): Unit = {
     if (deserializerStream != null){
       deserializerStream.close()
     } else {
