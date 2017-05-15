@@ -167,11 +167,11 @@ class CrailSparkDeserializationStream(defaultSerializer: Serializer, crailStream
   }
 
   override def read(buf: ByteBuffer): Int = {
-    0
+    throw new Exception("NYI")
   }
 
   override def available(): Int = {
-    0
+    throw new Exception("NYI")
   }
 
   private def getDefaultSerializationStream() : DeserializationStream = {
