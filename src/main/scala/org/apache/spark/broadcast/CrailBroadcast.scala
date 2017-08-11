@@ -92,7 +92,7 @@ private object CrailBroadcast {
 
   //FIXME: (atr) I am not completely sure about if this gives us the best performance.
   val broadcastCache:mutable.HashMap[Long, Option[Any]] = new mutable.HashMap[Long, Option[Any]]
-  private val useLocalCache = true
+  private val useLocalCache = false
 
   def unbroadcast(id: Long, removeFromDriver: Boolean, blocking: Boolean): Unit = {
     this.synchronized {

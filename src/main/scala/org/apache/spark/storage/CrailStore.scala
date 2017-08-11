@@ -32,7 +32,6 @@ import org.apache.spark._
 import org.apache.spark.common._
 import org.apache.spark.executor.ShuffleWriteMetrics
 import org.apache.spark.serializer.{CrailSerializer, CrailSerializationStream, CrailSerializerInstance}
-import org.apache.spark.shuffle.CrailShuffleSorter
 import org.apache.spark.util.Utils
 import scala.reflect.ClassTag
 import scala.util.Random
@@ -63,23 +62,25 @@ class CrailStore () extends Logging {
   val metaDir = rootDir + "/meta"
   val hostsDir = metaDir + "/hosts"
 
-  var mapLocationAffinity : Boolean = _
   var deleteOnClose : Boolean = _
   var deleteOnStart : Boolean = _
-  var outstanding : Int = _
   var preallocate : Int = 0
-  var shuffleCycle : Int = _
   var writeAhead : Long = _
   var debug : Boolean = _
-  var hostHash : Int = 0
-  var isMap : AtomicBoolean = new AtomicBoolean(true)
   var crailSerializerClass : String = _
+  var mapLocationAffinity : Boolean = _
+  var outstanding : Int = _
+  var shuffleCycle : Int = _
+  var shuffleStorageClass : CrailStorageClass = _
+  var broadcastStorageClass : CrailStorageClass = _
+
 
   var fs : CrailFS = _
   var fileCache : ConcurrentHashMap[String, CrailBlockFile] = _
   var shuffleCache: ConcurrentHashMap[Integer, CrailShuffleStore] = _
   var crailSerializer : CrailSerializer = _
-//  var defaultSerializerInstance : CrailSerializerInstance = _
+  var localLocationClass : CrailLocationClass = CrailLocationClass.DEFAULT
+  var isMap : AtomicBoolean = new AtomicBoolean(true)
 
   var fileGroupOpenStats = new AtomicLong(0)
   var streamGroupOpenStats = new AtomicLong(0)
@@ -91,37 +92,41 @@ class CrailStore () extends Logging {
 
 
   private def init(): Unit = {
-    logInfo("CrailStore starting version 300")
+    logInfo("CrailStore starting version 400")
 
-    mapLocationAffinity = conf.getBoolean("spark.crail.shuffle.map.locationaffinity", true)
     deleteOnClose = conf.getBoolean("spark.crail.deleteonclose", false)
     deleteOnStart = conf.getBoolean("spark.crail.deleteonstart", true)
-    outstanding = conf.getInt("spark.crail.shuffle.outstanding", 1)
     preallocate = conf.getInt("spark.crail.preallocate", 0)
-    shuffleCycle = conf.getInt("spark.crail.shuffleCycle", Int.MaxValue)
     writeAhead = conf.getLong("spark.crail.writeAhead", 0)
     debug = conf.getBoolean("spark.crail.debug", false)
     crailSerializerClass = conf.get("spark.crail.serializer", "org.apache.spark.serializer.CrailSparkSerializer")
 
-    logInfo("spark.crail.shuffle.affinity " + mapLocationAffinity)
+    mapLocationAffinity = conf.getBoolean("spark.crail.shuffle.map.locationaffinity", true)
+    outstanding = conf.getInt("spark.crail.shuffle.outstanding", 1)
+    shuffleCycle = conf.getInt("spark.crail.shuffle.cycle", Int.MaxValue)
+    shuffleStorageClass = CrailStorageClass.get(conf.getInt("spark.crail.shuffle.storageclass", 0))
+    broadcastStorageClass = CrailStorageClass.get(conf.getInt("spark.crail.broadcast.storageclass", 0))
+
     logInfo("spark.crail.deleteonclose " + deleteOnClose)
     logInfo("spark.crail.deleteOnStart " + deleteOnStart)
-    logInfo("spark.crail.shuffle.outstanding " + outstanding)
     logInfo("spark.crail.preallocate " + preallocate)
-    logInfo("spark.crail.shuffleCycle " + shuffleCycle)
     logInfo("spark.crail.writeAhead " + writeAhead)
     logInfo("spark.crail.debug " + debug)
     logInfo("spark.crail.serializer " + crailSerializerClass)
+    logInfo("spark.crail.shuffle.affinity " + mapLocationAffinity)
+    logInfo("spark.crail.shuffle.outstanding " + outstanding)
+    logInfo("spark.crail.shuffle.cycle " + shuffleCycle)
+    logInfo("spark.crail.shuffle.storageclass " + shuffleStorageClass.value())
+    logInfo("spark.crail.broadcast.storageclass " + broadcastStorageClass.value())
 
     val crailConf = new CrailConfiguration();
     fs = CrailFS.newInstance(crailConf)
     fileCache = new ConcurrentHashMap[String, CrailBlockFile]()
     shuffleCache = new ConcurrentHashMap[Integer, CrailShuffleStore]()
     crailSerializer = Utils.classForName(crailSerializerClass).newInstance.asInstanceOf[CrailSerializer]
-//    defaultSerializerInstance = crailSerializer.newCrailSerializer(serializer)
 
     if (mapLocationAffinity){
-      hostHash = fs.getHostHash
+      localLocationClass = fs.getLocationClass()
     }
 
     if (executorId == "driver"){
@@ -133,21 +138,21 @@ class CrailStore () extends Logging {
         if (baseDirExists){
           fs.delete(rootDir, true).get().syncDir()
         }
-        fs.create(rootDir, CrailNodeType.DIRECTORY, 0, 0).get().syncDir()
-        fs.create(broadcastDir, CrailNodeType.DIRECTORY, 0, 0).get().syncDir()
-        fs.create(shuffleDir, CrailNodeType.DIRECTORY, 0, 0).get().syncDir()
-        fs.create(rddDir, CrailNodeType.DIRECTORY, 0, 0).get().syncDir()
-        fs.create(tmpDir, CrailNodeType.DIRECTORY, 0, 0).get().syncDir()
-        fs.create(metaDir, CrailNodeType.DIRECTORY, 0, 0).get().syncDir()
-        fs.create(hostsDir, CrailNodeType.DIRECTORY, 0, 0).get().syncDir()
+        fs.create(rootDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().syncDir()
+        fs.create(broadcastDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().syncDir()
+        fs.create(shuffleDir, CrailNodeType.DIRECTORY, shuffleStorageClass, CrailLocationClass.DEFAULT).get().syncDir()
+        fs.create(rddDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().syncDir()
+        fs.create(tmpDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().syncDir()
+        fs.create(metaDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().syncDir()
+        fs.create(hostsDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().syncDir()
         logInfo("creating main dir done " + rootDir)
       }
     }
 
     try {
-      val hostFile = hostsDir + "/" + fs.getHostHash
+      val hostFile = hostsDir + "/" + fs.getLocationClass().value();
       logInfo("creating hostFile " + hostFile)
-      fs.create(hostFile, CrailNodeType.DATAFILE, 0, 0).get().syncDir()
+      fs.create(hostFile, CrailNodeType.DATAFILE, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().syncDir()
       logInfo("creating hostFile done " + hostFile)
     } catch {
       case e: Exception =>
@@ -158,7 +163,7 @@ class CrailStore () extends Logging {
     try {
       logInfo("buffer cache warmup ")
       val tmpFile = tmpDir + "/" + Random.nextDouble()
-      var file = fs.create(tmpFile, CrailNodeType.DATAFILE, 0, 0).get().asFile()
+      var file = fs.create(tmpFile, CrailNodeType.DATAFILE, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().asFile()
       file.syncDir()
       var fileStream = file.getDirectOutputStream(0)
       val bufferQueue = new LinkedBlockingQueue[CrailBuffer]
@@ -221,7 +226,7 @@ class CrailStore () extends Logging {
         //        logInfo("fresh file, writing " + blockId.name)
         val path = getPath(blockId)
         try {
-          fileInfo = fs.create(path, CrailNodeType.DATAFILE, 0, 0).get().asFile()
+          fileInfo = fs.create(path, CrailNodeType.DATAFILE, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().asFile()
           if (fileInfo != null && fileInfo.getCapacity() == 0) {
             val stream = fileInfo.getBufferedOutputStream(0)
             val byteBuffer = bytes.duplicate()
@@ -247,7 +252,7 @@ class CrailStore () extends Logging {
       if (fileInfo == null || (fileInfo != null && fileInfo.getToken() == 0)) {
         val path = getPath(blockId)
         try {
-          fileInfo = fs.create(path, CrailNodeType.DATAFILE, 0, 0).get().asFile()
+          fileInfo = fs.create(path, CrailNodeType.DATAFILE, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().asFile()
           if (fileInfo != null && fileInfo.getCapacity() == 0) {
             val stream = fileInfo.getBufferedOutputStream(0)
             val instance = serializer.newInstance()
@@ -341,7 +346,7 @@ class CrailStore () extends Logging {
   def writeBroadcast[T: ClassTag](blockId: BlockId, value: T): Unit = {
     val path = getPath(blockId)
     try {
-      val fileInfo = fs.create(path, CrailNodeType.DATAFILE, 0, 0).get().asFile()
+      val fileInfo = fs.create(path, CrailNodeType.DATAFILE, broadcastStorageClass, CrailLocationClass.DEFAULT).get().asFile()
       val stream = fileInfo.getBufferedOutputStream(0)
       val serializationStream = crailSerializer.newCrailSerializer(serializer).serializeCrailStream(stream)
       serializationStream.writeBroadcast(value)
@@ -428,12 +433,12 @@ class CrailStore () extends Logging {
     val futureQueue = new LinkedBlockingQueue[Future[CrailNode]]()
     val start = System.currentTimeMillis()
     val shuffleIdDir = shuffleDir + "/shuffle_" + shuffleId
-    var future : Future[CrailNode] = fs.create(shuffleIdDir, CrailNodeType.DIRECTORY, 0, 0)
+    var future : Future[CrailNode] = fs.create(shuffleIdDir, CrailNodeType.DIRECTORY, CrailStorageClass.PARENT, CrailLocationClass.DEFAULT)
     futureQueue.add(future)
     val i = 0
     for (i <- 0 until partitions){
       val subDir = shuffleIdDir + "/" + "part_" + i.toString
-      future = fs.create(subDir, CrailNodeType.MULTIFILE, 0, 0)
+      future = fs.create(subDir, CrailNodeType.MULTIFILE, CrailStorageClass.PARENT, CrailLocationClass.DEFAULT)
       futureQueue.add(future)
     }
     val fileQueue = new LinkedBlockingQueue[CrailNode]()
@@ -475,7 +480,7 @@ class CrailStore () extends Logging {
       }
     }
 
-    var fileGroup : CrailFileGroup = shuffleStore.getFileGroup(shuffleId, executorId, numBuckets, shuffleDir, fs, hostHash)
+    var fileGroup : CrailFileGroup = shuffleStore.getFileGroup(shuffleId, executorId, numBuckets, shuffleDir, fs, localLocationClass)
     return fileGroup
   }
 
@@ -564,7 +569,7 @@ class CrailShuffleStore{
   var store: LinkedBlockingQueue[CrailFileGroup] = new LinkedBlockingQueue[CrailFileGroup]()
   var size : AtomicInteger = new AtomicInteger(0)
 
-  def getFileGroup(shuffleId: Int, executorId: String, numBuckets: Int, shuffleDir: String, fs: CrailFS, hostHash: Int) : CrailFileGroup = {
+  def getFileGroup(shuffleId: Int, executorId: String, numBuckets: Int, shuffleDir: String, fs: CrailFS, locationClass: CrailLocationClass) : CrailFileGroup = {
     var fileGroup = store.poll()
     if (fileGroup == null){
       store.synchronized{
@@ -573,8 +578,8 @@ class CrailShuffleStore{
           val coreId = size.getAndIncrement()
           val futures: Array[Upcoming[CrailNode]] = new Array[Upcoming[CrailNode]](numBuckets)
           for (i <- 0 until numBuckets) {
-            val filename = shuffleDir + "/shuffle_" + shuffleId + "/part_" + i + "/" + coreId + "-" + executorId + "-" + fs.getHostHash
-            futures(i) = fs.create(filename, CrailNodeType.DATAFILE, 0, hostHash)
+            val filename = shuffleDir + "/shuffle_" + shuffleId + "/part_" + i + "/" + coreId + "-" + executorId + "-" + fs.getLocationClass().value()
+            futures(i) = fs.create(filename, CrailNodeType.DATAFILE, CrailStorageClass.PARENT, CrailLocationClass.DEFAULT)
           }
           val files: Array[CrailNode] = new Array[CrailNode](numBuckets)
           for (i <- 0 until numBuckets) {
