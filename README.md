@@ -1,6 +1,6 @@
 # Spark-IO
 
-Spark-IO contains various I/O accleration plugins for Spark tailored to high-performance network and storage hardware (RDMA, NVMef, etc.). Spark-IO is based on Crail, a fast multi-tiered distributed storage system. Spark-IO currently contains two IO plugins: a shuffle engine and a broadcast module. Both plugins inherit all the benefits of Crail such as very high performance (throughput and latency) and multi-tiering (e.g., DRAM and flash).
+Crail-Spark-IO contains various I/O accleration plugins for Spark tailored to high-performance network and storage hardware (RDMA, NVMef, etc.). Spark-IO is based on Crail, a fast multi-tiered distributed storage system. Spark-IO currently contains two IO plugins: a shuffle engine and a broadcast module. Both plugins inherit all the benefits of Crail such as very high performance (throughput and latency) and multi-tiering (e.g., DRAM and flash).
 
 ## Requirements
 
@@ -13,10 +13,10 @@ Spark-IO contains various I/O accleration plugins for Spark tailored to high-per
 Building the source requires [Apache Maven](http://maven.apache.org/) and Java version 8 or higher.
 To build Crail execute the following steps:
 
-1. Obtain a copy of [Spark-IO](https://github.com/zrlio/spark-io) from Github
+1. Obtain a copy of [Crail-Spark-IO](https://github.com/zrlio/crail-spark-io) from Github
 2. Make sure your local maven repo contains [Crail](https://github.com/zrlio/crail), if not build Crail from Github
 4. Run: mvn -DskipTests install
-5. Add spark-io-1.0.jar as well as its Crail dependencies to the extra class path in Spark, both for the driver and the executors
+5. Add crail-spark-1.0.jar as well as its Crail dependencies to the extra class path in Spark, both for the driver and the executors
 
 ```
 spark.driver.extraClassPath     $CRAIL_HOME/jars/*:<path>/spark-io.jar:.
