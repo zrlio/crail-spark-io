@@ -28,7 +28,7 @@ import org.apache.spark.common._
 import org.apache.spark.network.buffer.ManagedBuffer
 import org.apache.spark.serializer.CrailSerializer
 import org.apache.spark.shuffle._
-import org.apache.spark.storage.{CrailDispatcher$, ShuffleBlockId}
+import org.apache.spark.storage.{CrailDispatcher, ShuffleBlockId}
 import org.apache.spark.util.Utils
 
 

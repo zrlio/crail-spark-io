@@ -25,9 +25,9 @@ import java.nio.ByteBuffer
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicLong}
 import java.util.concurrent.{ConcurrentHashMap, Future, LinkedBlockingQueue, TimeUnit}
 
-import com.ibm.crail._
-import com.ibm.crail.conf.CrailConfiguration
-import com.ibm.crail.utils.CrailImmediateOperation
+import org.apache.crail._
+import org.apache.crail.conf.CrailConfiguration
+import org.apache.crail.utils.CrailImmediateOperation
 import org.apache.spark._
 import org.apache.spark.common._
 import org.apache.spark.executor.ShuffleWriteMetrics
@@ -75,7 +75,7 @@ class CrailDispatcher () extends Logging {
   var broadcastStorageClass : CrailStorageClass = _
 
 
-  var fs : CrailFS = _
+  var fs : CrailStore = _
   var fileCache : ConcurrentHashMap[String, CrailBlockFile] = _
   var shuffleCache: ConcurrentHashMap[Integer, CrailShuffleStore] = _
   var crailSerializer : CrailSerializer = _
@@ -120,7 +120,7 @@ class CrailDispatcher () extends Logging {
     logInfo("spark.crail.broadcast.storageclass " + broadcastStorageClass.value())
 
     val crailConf = new CrailConfiguration();
-    fs = CrailFS.newInstance(crailConf)
+    fs = CrailStore.newInstance(crailConf)
     fileCache = new ConcurrentHashMap[String, CrailBlockFile]()
     shuffleCache = new ConcurrentHashMap[Integer, CrailShuffleStore]()
     crailSerializer = Utils.classForName(crailSerializerClass).newInstance.asInstanceOf[CrailSerializer]
@@ -569,7 +569,7 @@ class CrailShuffleStore{
   var store: LinkedBlockingQueue[CrailFileGroup] = new LinkedBlockingQueue[CrailFileGroup]()
   var size : AtomicInteger = new AtomicInteger(0)
 
-  def getFileGroup(shuffleId: Int, executorId: String, numBuckets: Int, shuffleDir: String, fs: CrailFS, locationClass: CrailLocationClass) : CrailFileGroup = {
+  def getFileGroup(shuffleId: Int, executorId: String, numBuckets: Int, shuffleDir: String, fs: CrailStore, locationClass: CrailLocationClass) : CrailFileGroup = {
     var fileGroup = store.poll()
     if (fileGroup == null){
       store.synchronized{
@@ -597,7 +597,7 @@ class CrailShuffleStore{
   }
 }
 
-class CrailShuffleWriterGroup(val fs: CrailFS, val fileGroup: CrailFileGroup, shuffleId: Int, serializerInstance: CrailSerializerInstance, writeMetrics: ShuffleWriteMetrics, writeAhead: Long) extends Logging {
+class CrailShuffleWriterGroup(val fs: CrailStore, val fileGroup: CrailFileGroup, shuffleId: Int, serializerInstance: CrailSerializerInstance, writeMetrics: ShuffleWriteMetrics, writeAhead: Long) extends Logging {
   val writers: Array[CrailObjectWriter] = new Array[CrailObjectWriter](fileGroup.writers.length)
 
   for (i <- 0 until fileGroup.writers.length){
