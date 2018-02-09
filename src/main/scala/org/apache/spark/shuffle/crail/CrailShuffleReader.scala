@@ -42,11 +42,11 @@ class CrailShuffleReader[K, C](
   require(endPartition == startPartition + 1, "Crail shuffle currently only supports fetching one partition")
 
   private val dep = handle.dependency
-  private val serializerInstance = CrailStore.get.getCrailSerializer().newCrailSerializer(dep.serializer)
+  private val serializerInstance = CrailDispatcher.get.getCrailSerializer().newCrailSerializer(dep.serializer)
 
   /** Read the combined key-values for this reduce task */
   override def read(): Iterator[Product2[K, C]] = {
-    val multiStream = CrailStore.get.getMultiStream(handle.shuffleId, startPartition, handle.numMaps)
+    val multiStream = CrailDispatcher.get.getMultiStream(handle.shuffleId, startPartition, handle.numMaps)
     val deserializationStream = serializerInstance.deserializeCrailStream(multiStream)
     dep.keyOrdering match {
       case Some(keyOrd: Ordering[K]) =>

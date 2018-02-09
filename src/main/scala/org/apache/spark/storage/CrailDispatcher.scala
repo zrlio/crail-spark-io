@@ -48,7 +48,7 @@ class CrailBlockFile (name: String, var file: CrailFile) {
 }
 
 
-class CrailStore () extends Logging {
+class CrailDispatcher () extends Logging {
   val executorId: String = SparkEnv.get.executorId
   val conf = SparkEnv.get.conf
   val appId: String = conf.getAppId
@@ -641,16 +641,16 @@ class CrailShuffleWriterGroup(val fs: CrailFS, val fileGroup: CrailFileGroup, sh
   }
 }
 
-object CrailStore extends Logging {
+object CrailDispatcher extends Logging {
   private val lock = new Object()
-  private var store: CrailStore = null
+  private var store: CrailDispatcher = null
   private val shutdown : AtomicBoolean = new AtomicBoolean(false)
 
-  def get: CrailStore = {
+  def get: CrailDispatcher = {
     if (store == null){
       lock.synchronized {
         if (store == null && !shutdown.get()){
-          val _store = new CrailStore()
+          val _store = new CrailDispatcher()
           _store.init()
           store = _store
         } else if (store == null && shutdown.get()){
