@@ -23,7 +23,7 @@ package org.apache.spark.serializer
 
 import java.nio.ByteBuffer
 
-import com.ibm.crail.{CrailBufferedInputStream, CrailBufferedOutputStream}
+import org.apache.crail.{CrailBufferedInputStream, CrailBufferedOutputStream}
 import org.apache.spark.annotation.DeveloperApi
 import scala.reflect.ClassTag
 

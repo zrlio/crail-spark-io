@@ -54,7 +54,7 @@ private[spark] class CrailBroadcast[T: ClassTag](obj: T, id: Long)
   }
   
   private def writeBlocks(value: T) {
-    CrailStore.get.writeBroadcast(broadcastId, value)
+    CrailDispatcher.get.writeBroadcast(broadcastId, value)
   }
 
   private def readBroadcastBlock(): T = Utils.tryOrIOException {
@@ -70,7 +70,7 @@ private[spark] class CrailBroadcast[T: ClassTag](obj: T, id: Long)
         case Some(x) => x.asInstanceOf[T]
         /* we don't have it */
         case None =>
-          val bc = CrailStore.get.readBroadcast(id, broadcastId)
+          val bc = CrailDispatcher.get.readBroadcast(id, broadcastId)
           bc match {
             case Some(x) => /* we read it and now put in the local store */
               val obj = x.asInstanceOf[T]

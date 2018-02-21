@@ -40,9 +40,9 @@ class CrailShuffleWriter[K, V](
   private val blockManager = SparkEnv.get.blockManager
   private var stopping = false
   private val writeMetrics = context.taskMetrics().shuffleWriteMetrics
-  var serializerInstance =  CrailStore.get.getCrailSerializer().newCrailSerializer(dep.serializer)
+  var serializerInstance =  CrailDispatcher.get.getCrailSerializer().newCrailSerializer(dep.serializer)
   var startTime : Double = System.nanoTime() / 1000
-  private val shuffle : CrailShuffleWriterGroup = CrailStore.get.getWriterGroup(dep.shuffleId, dep.partitioner.numPartitions, serializerInstance, writeMetrics)
+  private val shuffle : CrailShuffleWriterGroup = CrailDispatcher.get.getWriterGroup(dep.shuffleId, dep.partitioner.numPartitions, serializerInstance, writeMetrics)
   var initTime : Double = (System.nanoTime()/1000) - startTime
   var runTime : Double = 0
   var initRatio : Double = 0
@@ -77,7 +77,7 @@ class CrailShuffleWriter[K, V](
     if (success) {
       shuffle.purge()
       val sizes: Array[Long] = shuffle.writers.map {writer => writer.length }
-      CrailStore.get.releaseWriterGroup(dep.shuffleId, shuffle)
+      CrailDispatcher.get.releaseWriterGroup(dep.shuffleId, shuffle)
       runTime = (System.nanoTime()/1000) - startTime
       initRatio = runTime/initTime
       overhead = 100/initRatio

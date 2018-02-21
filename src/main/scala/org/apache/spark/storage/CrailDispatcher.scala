@@ -25,9 +25,9 @@ import java.nio.ByteBuffer
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicLong}
 import java.util.concurrent.{ConcurrentHashMap, Future, LinkedBlockingQueue, TimeUnit}
 
-import com.ibm.crail._
-import com.ibm.crail.conf.CrailConfiguration
-import com.ibm.crail.utils.CrailImmediateOperation
+import org.apache.crail._
+import org.apache.crail.conf.CrailConfiguration
+import org.apache.crail.utils.CrailImmediateOperation
 import org.apache.spark._
 import org.apache.spark.common._
 import org.apache.spark.executor.ShuffleWriteMetrics
@@ -48,7 +48,7 @@ class CrailBlockFile (name: String, var file: CrailFile) {
 }
 
 
-class CrailStore () extends Logging {
+class CrailDispatcher () extends Logging {
   val executorId: String = SparkEnv.get.executorId
   val conf = SparkEnv.get.conf
   val appId: String = conf.getAppId
@@ -75,7 +75,7 @@ class CrailStore () extends Logging {
   var broadcastStorageClass : CrailStorageClass = _
 
 
-  var fs : CrailFS = _
+  var fs : CrailStore = _
   var fileCache : ConcurrentHashMap[String, CrailBlockFile] = _
   var shuffleCache: ConcurrentHashMap[Integer, CrailShuffleStore] = _
   var crailSerializer : CrailSerializer = _
@@ -120,7 +120,7 @@ class CrailStore () extends Logging {
     logInfo("spark.crail.broadcast.storageclass " + broadcastStorageClass.value())
 
     val crailConf = new CrailConfiguration();
-    fs = CrailFS.newInstance(crailConf)
+    fs = CrailStore.newInstance(crailConf)
     fileCache = new ConcurrentHashMap[String, CrailBlockFile]()
     shuffleCache = new ConcurrentHashMap[Integer, CrailShuffleStore]()
     crailSerializer = Utils.classForName(crailSerializerClass).newInstance.asInstanceOf[CrailSerializer]
@@ -569,7 +569,7 @@ class CrailShuffleStore{
   var store: LinkedBlockingQueue[CrailFileGroup] = new LinkedBlockingQueue[CrailFileGroup]()
   var size : AtomicInteger = new AtomicInteger(0)
 
-  def getFileGroup(shuffleId: Int, executorId: String, numBuckets: Int, shuffleDir: String, fs: CrailFS, locationClass: CrailLocationClass) : CrailFileGroup = {
+  def getFileGroup(shuffleId: Int, executorId: String, numBuckets: Int, shuffleDir: String, fs: CrailStore, locationClass: CrailLocationClass) : CrailFileGroup = {
     var fileGroup = store.poll()
     if (fileGroup == null){
       store.synchronized{
@@ -597,7 +597,7 @@ class CrailShuffleStore{
   }
 }
 
-class CrailShuffleWriterGroup(val fs: CrailFS, val fileGroup: CrailFileGroup, shuffleId: Int, serializerInstance: CrailSerializerInstance, writeMetrics: ShuffleWriteMetrics, writeAhead: Long) extends Logging {
+class CrailShuffleWriterGroup(val fs: CrailStore, val fileGroup: CrailFileGroup, shuffleId: Int, serializerInstance: CrailSerializerInstance, writeMetrics: ShuffleWriteMetrics, writeAhead: Long) extends Logging {
   val writers: Array[CrailObjectWriter] = new Array[CrailObjectWriter](fileGroup.writers.length)
 
   for (i <- 0 until fileGroup.writers.length){
@@ -641,16 +641,16 @@ class CrailShuffleWriterGroup(val fs: CrailFS, val fileGroup: CrailFileGroup, sh
   }
 }
 
-object CrailStore extends Logging {
+object CrailDispatcher extends Logging {
   private val lock = new Object()
-  private var store: CrailStore = null
+  private var store: CrailDispatcher = null
   private val shutdown : AtomicBoolean = new AtomicBoolean(false)
 
-  def get: CrailStore = {
+  def get: CrailDispatcher = {
     if (store == null){
       lock.synchronized {
         if (store == null && !shutdown.get()){
-          val _store = new CrailStore()
+          val _store = new CrailDispatcher()
           _store.init()
           store = _store
         } else if (store == null && shutdown.get()){

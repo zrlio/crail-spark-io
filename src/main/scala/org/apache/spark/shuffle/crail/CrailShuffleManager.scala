@@ -28,7 +28,7 @@ import org.apache.spark.common._
 import org.apache.spark.network.buffer.ManagedBuffer
 import org.apache.spark.serializer.CrailSerializer
 import org.apache.spark.shuffle._
-import org.apache.spark.storage.{CrailStore, ShuffleBlockId}
+import org.apache.spark.storage.{CrailDispatcher, ShuffleBlockId}
 import org.apache.spark.util.Utils
 
 
@@ -49,7 +49,7 @@ private[spark] class CrailShuffleManager(conf: SparkConf) extends ShuffleManager
       shuffleId: Int,
       numMaps: Int,
       dependency: ShuffleDependency[K, V, C]): ShuffleHandle = {
-    CrailStore.get.registerShuffle(shuffleId, numMaps, dependency.partitioner.numPartitions)
+    CrailDispatcher.get.registerShuffle(shuffleId, numMaps, dependency.partitioner.numPartitions)
     new BaseShuffleHandle(shuffleId, numMaps, dependency)
   }  
   
@@ -78,7 +78,7 @@ private[spark] class CrailShuffleManager(conf: SparkConf) extends ShuffleManager
   
   /** Remove a shuffle's metadata from the ShuffleManager. */
   override def unregisterShuffle(shuffleId: Int): Boolean = {
-    CrailStore.get.unregisterShuffle(shuffleId)
+    CrailDispatcher.get.unregisterShuffle(shuffleId)
     true
   }  
   
@@ -89,7 +89,7 @@ private[spark] class CrailShuffleManager(conf: SparkConf) extends ShuffleManager
   /** Shut down this ShuffleManager. */
   override def stop(): Unit = {
     logInfo("shutting down crail shuffle manager")
-    CrailStore.put
+    CrailDispatcher.put
   }
 }
 
