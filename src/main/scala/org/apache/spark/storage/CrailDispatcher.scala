@@ -138,13 +138,13 @@ class CrailDispatcher () extends Logging {
         if (baseDirExists){
           fs.delete(rootDir, true).get().syncDir()
         }
-        fs.create(rootDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().syncDir()
-        fs.create(broadcastDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().syncDir()
-        fs.create(shuffleDir, CrailNodeType.DIRECTORY, shuffleStorageClass, CrailLocationClass.DEFAULT).get().syncDir()
-        fs.create(rddDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().syncDir()
-        fs.create(tmpDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().syncDir()
-        fs.create(metaDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().syncDir()
-        fs.create(hostsDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().syncDir()
+        fs.create(rootDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT, true).get().syncDir()
+        fs.create(broadcastDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT, true).get().syncDir()
+        fs.create(shuffleDir, CrailNodeType.DIRECTORY, shuffleStorageClass, CrailLocationClass.DEFAULT, true).get().syncDir()
+        fs.create(rddDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT, true).get().syncDir()
+        fs.create(tmpDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT, true).get().syncDir()
+        fs.create(metaDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT, true).get().syncDir()
+        fs.create(hostsDir, CrailNodeType.DIRECTORY, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT, true).get().syncDir()
         logInfo("creating main dir done " + rootDir)
       }
     }
@@ -152,7 +152,7 @@ class CrailDispatcher () extends Logging {
     try {
       val hostFile = hostsDir + "/" + fs.getLocationClass().value();
       logInfo("creating hostFile " + hostFile)
-      fs.create(hostFile, CrailNodeType.DATAFILE, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().syncDir()
+      fs.create(hostFile, CrailNodeType.DATAFILE, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT, true).get().syncDir()
       logInfo("creating hostFile done " + hostFile)
     } catch {
       case e: Exception =>
@@ -163,7 +163,7 @@ class CrailDispatcher () extends Logging {
     try {
       logInfo("buffer cache warmup ")
       val tmpFile = tmpDir + "/" + Random.nextDouble()
-      var file = fs.create(tmpFile, CrailNodeType.DATAFILE, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().asFile()
+      var file = fs.create(tmpFile, CrailNodeType.DATAFILE, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT, true).get().asFile()
       file.syncDir()
       var fileStream = file.getDirectOutputStream(0)
       val bufferQueue = new LinkedBlockingQueue[CrailBuffer]
@@ -226,7 +226,7 @@ class CrailDispatcher () extends Logging {
         //        logInfo("fresh file, writing " + blockId.name)
         val path = getPath(blockId)
         try {
-          fileInfo = fs.create(path, CrailNodeType.DATAFILE, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().asFile()
+          fileInfo = fs.create(path, CrailNodeType.DATAFILE, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT, true).get().asFile()
           if (fileInfo != null && fileInfo.getCapacity() == 0) {
             val stream = fileInfo.getBufferedOutputStream(0)
             val byteBuffer = bytes.duplicate()
@@ -252,7 +252,7 @@ class CrailDispatcher () extends Logging {
       if (fileInfo == null || (fileInfo != null && fileInfo.getToken() == 0)) {
         val path = getPath(blockId)
         try {
-          fileInfo = fs.create(path, CrailNodeType.DATAFILE, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT).get().asFile()
+          fileInfo = fs.create(path, CrailNodeType.DATAFILE, CrailStorageClass.DEFAULT, CrailLocationClass.DEFAULT, true).get().asFile()
           if (fileInfo != null && fileInfo.getCapacity() == 0) {
             val stream = fileInfo.getBufferedOutputStream(0)
             val instance = serializer.newInstance()
@@ -346,7 +346,7 @@ class CrailDispatcher () extends Logging {
   def writeBroadcast[T: ClassTag](blockId: BlockId, value: T): Unit = {
     val path = getPath(blockId)
     try {
-      val fileInfo = fs.create(path, CrailNodeType.DATAFILE, broadcastStorageClass, CrailLocationClass.DEFAULT).get().asFile()
+      val fileInfo = fs.create(path, CrailNodeType.DATAFILE, broadcastStorageClass, CrailLocationClass.DEFAULT, true).get().asFile()
       val stream = fileInfo.getBufferedOutputStream(0)
       val serializationStream = crailSerializer.newCrailSerializer(serializer).serializeCrailStream(stream)
       serializationStream.writeBroadcast(value)
@@ -433,12 +433,12 @@ class CrailDispatcher () extends Logging {
     val futureQueue = new LinkedBlockingQueue[Future[CrailNode]]()
     val start = System.currentTimeMillis()
     val shuffleIdDir = shuffleDir + "/shuffle_" + shuffleId
-    var future : Future[CrailNode] = fs.create(shuffleIdDir, CrailNodeType.DIRECTORY, CrailStorageClass.PARENT, CrailLocationClass.DEFAULT)
+    var future : Future[CrailNode] = fs.create(shuffleIdDir, CrailNodeType.DIRECTORY, CrailStorageClass.PARENT, CrailLocationClass.DEFAULT, true)
     futureQueue.add(future)
     val i = 0
     for (i <- 0 until partitions){
       val subDir = shuffleIdDir + "/" + "part_" + i.toString
-      future = fs.create(subDir, CrailNodeType.MULTIFILE, CrailStorageClass.PARENT, CrailLocationClass.DEFAULT)
+      future = fs.create(subDir, CrailNodeType.MULTIFILE, CrailStorageClass.PARENT, CrailLocationClass.DEFAULT, true)
       futureQueue.add(future)
     }
     val fileQueue = new LinkedBlockingQueue[CrailNode]()
@@ -579,7 +579,7 @@ class CrailShuffleStore{
           val futures: Array[Upcoming[CrailNode]] = new Array[Upcoming[CrailNode]](numBuckets)
           for (i <- 0 until numBuckets) {
             val filename = shuffleDir + "/shuffle_" + shuffleId + "/part_" + i + "/" + coreId + "-" + executorId + "-" + fs.getLocationClass().value()
-            futures(i) = fs.create(filename, CrailNodeType.DATAFILE, CrailStorageClass.PARENT, CrailLocationClass.DEFAULT)
+            futures(i) = fs.create(filename, CrailNodeType.DATAFILE, CrailStorageClass.PARENT, CrailLocationClass.DEFAULT, true)
           }
           val files: Array[CrailNode] = new Array[CrailNode](numBuckets)
           for (i <- 0 until numBuckets) {
