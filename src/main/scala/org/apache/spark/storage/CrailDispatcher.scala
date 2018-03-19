@@ -164,9 +164,11 @@ class CrailDispatcher () extends Logging {
       file.syncDir()
       var fileStream = file.getDirectOutputStream(0)
       val bufferQueue = new LinkedBlockingQueue[CrailBuffer]
-      for( i <- 0 until preallocate){
+      var i = 0
+      while ( i < preallocate){
         var buf = fs.allocateBuffer()
         bufferQueue.add(buf)
+        i+=1
       }
       var buf = bufferQueue.poll()
       while (buf != null){
@@ -427,11 +429,12 @@ class CrailDispatcher () extends Logging {
     val shuffleIdDir = shuffleDir + "/shuffle_" + shuffleId
     var future : Future[CrailNode] = fs.create(shuffleIdDir, CrailNodeType.DIRECTORY, CrailStorageClass.PARENT, CrailLocationClass.DEFAULT, true)
     futureQueue.add(future)
-    val i = 0
-    for (i <- 0 until partitions){
+    var i = 0
+    while (i < partitions) {
       val subDir = shuffleIdDir + "/" + "part_" + i.toString
       future = fs.create(subDir, CrailNodeType.MULTIFILE, CrailStorageClass.PARENT, CrailLocationClass.DEFAULT, true)
       futureQueue.add(future)
+      i+=1
     }
     val fileQueue = new LinkedBlockingQueue[CrailNode]()
     while(!futureQueue.isEmpty){
@@ -564,13 +567,17 @@ class CrailShuffleStore{
         if (fileGroup == null){
           val coreId = size.getAndIncrement()
           val futures: Array[Upcoming[CrailNode]] = new Array[Upcoming[CrailNode]](numBuckets)
-          for (i <- 0 until numBuckets) {
+          var i = 0
+          while (i < numBuckets) {
             val filename = shuffleDir + "/shuffle_" + shuffleId + "/part_" + i + "/" + coreId + "-" + executorId + "-" + fs.getLocationClass().value()
             futures(i) = fs.create(filename, CrailNodeType.DATAFILE, CrailStorageClass.PARENT, CrailLocationClass.DEFAULT, true)
+            i+=1
           }
           val files: Array[CrailNode] = new Array[CrailNode](numBuckets)
-          for (i <- 0 until numBuckets) {
+          i = 0
+          while (i < numBuckets) {
             files(i) = futures(i).early()
+            i+=1
           }
           fileGroup = new CrailFileGroup(shuffleId, executorId, coreId, files)
         }
@@ -586,35 +593,42 @@ class CrailShuffleStore{
 
 class CrailShuffleWriterGroup(val fs: CrailStore, val fileGroup: CrailFileGroup, shuffleId: Int, serializerInstance: CrailSerializerInstance, writeMetrics: ShuffleWriteMetrics, writeAhead: Long) extends Logging {
   val writers: Array[CrailObjectWriter] = new Array[CrailObjectWriter](fileGroup.writers.length)
-
-  for (i <- 0 until fileGroup.writers.length){
+  var i = 0
+  while (i < fileGroup.writers.length){
     writers(i) = new CrailObjectWriter(fileGroup.writers(i), serializerInstance, writeMetrics, shuffleId, i, writeAhead)
+    i+=1
   }
 
   def purge(): Unit = {
-    for (i <- 0 until writers.length){
+    i = 0
+    while (i < writers.length){
       if (writers(i).isOpen){
         writers(i).flushSerializer()
       }
+      i+=1
     }
 
     val purgeQueue = new LinkedBlockingQueue[Future[_]]()
-    for (i <- 0 until writers.length){
+    i = 0
+    while (i < writers.length){
       if (writers(i).isOpen){
         val future = writers(i).purgeStream()
         purgeQueue.add(future)
       }
+      i+=1
     }
     while(!purgeQueue.isEmpty){
       purgeQueue.poll().get()
     }
 
     val syncQueue = new LinkedBlockingQueue[Future[_]]()
-    for (i <- 0 until writers.length){
+    i = 0
+    while (i < writers.length){
       if (writers(i).isOpen){
         val future = writers(i).syncStream()
         syncQueue.add(future)
       }
+      i+=1
     }
     while(!syncQueue.isEmpty){
       syncQueue.poll().get()
@@ -622,8 +636,10 @@ class CrailShuffleWriterGroup(val fs: CrailStore, val fileGroup: CrailFileGroup,
   }
 
   def close(): Unit = {
-    for (i <- 0 until writers.length){
+    i = 0
+    while (i < writers.length){
       writers(i).close()
+      i+=1
     }
   }
 }
