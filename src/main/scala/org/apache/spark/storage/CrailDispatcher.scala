@@ -70,7 +70,6 @@ class CrailDispatcher () extends Logging {
   var crailSerializerClass : String = _
   var mapLocationAffinity : Boolean = _
   var outstanding : Int = _
-  var shuffleCycle : Int = _
   var shuffleStorageClass : CrailStorageClass = _
   var broadcastStorageClass : CrailStorageClass = _
 
@@ -103,7 +102,6 @@ class CrailDispatcher () extends Logging {
 
     mapLocationAffinity = conf.getBoolean("spark.crail.shuffle.map.locationaffinity", true)
     outstanding = conf.getInt("spark.crail.shuffle.outstanding", 1)
-    shuffleCycle = conf.getInt("spark.crail.shuffle.cycle", Int.MaxValue)
     shuffleStorageClass = CrailStorageClass.get(conf.getInt("spark.crail.shuffle.storageclass", 0))
     broadcastStorageClass = CrailStorageClass.get(conf.getInt("spark.crail.broadcast.storageclass", 0))
 
@@ -115,7 +113,6 @@ class CrailDispatcher () extends Logging {
     logInfo("spark.crail.serializer " + crailSerializerClass)
     logInfo("spark.crail.shuffle.affinity " + mapLocationAffinity)
     logInfo("spark.crail.shuffle.outstanding " + outstanding)
-    logInfo("spark.crail.shuffle.cycle " + shuffleCycle)
     logInfo("spark.crail.shuffle.storageclass " + shuffleStorageClass.value())
     logInfo("spark.crail.broadcast.storageclass " + broadcastStorageClass.value())
 
@@ -422,8 +419,7 @@ class CrailDispatcher () extends Logging {
 
   /* Register a shuffle with the manager and obtain a handle for it to pass to tasks. */
   def registerShuffle(shuffleId: Int, numMaps: Int, partitions: Int) : Unit = {
-    //    logInfo("registering shuffle " + shuffleId + ", time " + ", cacheSize " + fs.getCacheSize)
-    unregisterShuffle(shuffleId - shuffleCycle)
+    //logInfo("registering shuffle " + shuffleId + ", time " + ", cacheSize " + fs.getCacheSize)
     if (shuffleCache.containsKey(shuffleId)){
       return
     }
