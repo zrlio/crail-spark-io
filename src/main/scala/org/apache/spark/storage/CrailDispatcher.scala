@@ -420,10 +420,6 @@ class CrailDispatcher () extends Logging {
   /* Register a shuffle with the manager and obtain a handle for it to pass to tasks. */
   def registerShuffle(shuffleId: Int, numMaps: Int, partitions: Int) : Unit = {
     //logInfo("registering shuffle " + shuffleId + ", time " + ", cacheSize " + fs.getCacheSize)
-    if (shuffleCache.containsKey(shuffleId)){
-      return
-    }
-
     val shuffleStore = new CrailShuffleStore
     val oldStore = shuffleCache.putIfAbsent(shuffleId, shuffleStore)
     val futureQueue = new LinkedBlockingQueue[Future[CrailNode]]()
@@ -452,14 +448,9 @@ class CrailDispatcher () extends Logging {
   /* Register a shuffle with the manager and obtain a handle for it to pass to tasks. */
   def unregisterShuffle(shuffleId: Int) : Unit = {
     try {
-      if (shuffleId >= 0){
-        if (!shuffleCache.containsKey(shuffleId)){
-          return
-        }
-        val shuffleIdDir = shuffleDir + "/shuffle_" + shuffleId
-        fs.delete(shuffleIdDir, true).get().syncDir()
-        shuffleCache.remove(shuffleId)
-      }
+      val shuffleIdDir = shuffleDir + "/shuffle_" + shuffleId
+      fs.delete(shuffleIdDir, true).get().syncDir()
+      shuffleCache.remove(shuffleId)
     } catch {
       case e: Exception =>
         logInfo("failed to unregister shuffle")
