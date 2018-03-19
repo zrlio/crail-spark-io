@@ -424,7 +424,7 @@ class CrailDispatcher () extends Logging {
   def registerShuffle(shuffleId: Int, numMaps: Int, partitions: Int) : Unit = {
     //    logInfo("registering shuffle " + shuffleId + ", time " + ", cacheSize " + fs.getCacheSize)
     unregisterShuffle(shuffleId - shuffleCycle)
-    if (shuffleCache.contains(shuffleId)){
+    if (shuffleCache.containsKey(shuffleId)){
       return
     }
 
@@ -457,7 +457,7 @@ class CrailDispatcher () extends Logging {
   def unregisterShuffle(shuffleId: Int) : Unit = {
     try {
       if (shuffleId >= 0){
-        if (!shuffleCache.contains(shuffleId)){
+        if (!shuffleCache.containsKey(shuffleId)){
           return
         }
         val shuffleIdDir = shuffleDir + "/shuffle_" + shuffleId
