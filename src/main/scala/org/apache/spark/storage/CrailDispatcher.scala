@@ -593,14 +593,19 @@ class CrailShuffleStore{
 
 class CrailShuffleWriterGroup(val fs: CrailStore, val fileGroup: CrailFileGroup, shuffleId: Int, serializerInstance: CrailSerializerInstance, writeMetrics: ShuffleWriteMetrics, writeAhead: Long) extends Logging {
   val writers: Array[CrailObjectWriter] = new Array[CrailObjectWriter](fileGroup.writers.length)
-  var i = 0
-  while (i < fileGroup.writers.length){
-    writers(i) = new CrailObjectWriter(fileGroup.writers(i), serializerInstance, writeMetrics, shuffleId, i, writeAhead)
-    i+=1
+  var writerIdx = 0
+  while (writerIdx < fileGroup.writers.length){
+    writers(writerIdx) = new CrailObjectWriter(fileGroup.writers(writerIdx),
+      serializerInstance,
+      writeMetrics,
+      shuffleId,
+      writerIdx,
+      writeAhead)
+    writerIdx+=1
   }
 
   def purge(): Unit = {
-    i = 0
+    var i = 0
     while (i < writers.length){
       if (writers(i).isOpen){
         writers(i).flushSerializer()
@@ -636,7 +641,7 @@ class CrailShuffleWriterGroup(val fs: CrailStore, val fileGroup: CrailFileGroup,
   }
 
   def close(): Unit = {
-    i = 0
+    var i = 0
     while (i < writers.length){
       writers(i).close()
       i+=1
