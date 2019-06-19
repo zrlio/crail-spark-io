@@ -116,7 +116,7 @@ class CrailDispatcher () extends Logging {
     logInfo("spark.crail.shuffle.storageclass " + shuffleStorageClass.value())
     logInfo("spark.crail.broadcast.storageclass " + broadcastStorageClass.value())
 
-    val crailConf = new CrailConfiguration();
+    val crailConf = CrailConfiguration.createConfigurationFromFile();
     fs = CrailStore.newInstance(crailConf)
     fileCache = new ConcurrentHashMap[String, CrailBlockFile]()
     shuffleCache = new ConcurrentHashMap[Integer, CrailShuffleStore]()
